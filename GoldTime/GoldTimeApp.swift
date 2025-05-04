@@ -8,6 +8,7 @@
 import SwiftUI
 import WidgetKit
 
+
 @main
 struct GoldTimeApp: App {
     // 创建一个时间管理器的实例，作为环境对象在整个应用中共享
@@ -17,10 +18,19 @@ struct GoldTimeApp: App {
         WindowGroup {
             ContentView()
                 .environmentObject(timeManager)
+                .onAppear {
+                    // 启动屏幕状态监视器
+                    ScreenStateMonitor.shared.startMonitoring()
+                }
+                .onDisappear {
+                    // 停止监视器
+                    ScreenStateMonitor.shared.stopMonitoring()
+                }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
                     // 当应用进入后台时，检查是否需要启动LiveActivity
                     if timeManager.settings.isWorking {
-                        LiveActivityManager.shared.startActivity(with: timeManager.settings)
+                        // 这里尝试使用现有的更新方法
+                        timeManager.updateLiveActivityIfNeeded()
                         
                         // 延长后台运行时间
                         BackgroundManager.shared.beginBackgroundTask()
@@ -29,9 +39,10 @@ struct GoldTimeApp: App {
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     // 当应用返回前台时，根据情况更新或关闭LiveActivity
                     if timeManager.settings.isWorking {
-                        LiveActivityManager.shared.updateActivity(with: timeManager.settings)
+                        timeManager.updateLiveActivityIfNeeded()
                     } else if !timeManager.settings.isWorking && LiveActivityManager.shared.hasActiveActivity {
-                        LiveActivityManager.shared.endActivity()
+                        timeManager.settings.isWorking = false
+                        timeManager.updateLiveActivityIfNeeded()
                     }
                     
                     // 结束后台任务

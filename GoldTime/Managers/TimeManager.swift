@@ -10,7 +10,7 @@ import SwiftUI
 import WidgetKit
 
 // 时间管理器类，负责跟踪工作时间和计算工资
-class TimeManager: ObservableObject {
+public class TimeManager: ObservableObject {
     @Published var settings: UserSettings {
         didSet {
             UserDefaultsManager.shared.saveUserSettings(settings)
@@ -118,7 +118,7 @@ class TimeManager: ObservableObject {
     }
     
     // 开始定时更新（如果正在工作）
-    private func startUpdatingIfNeeded() {
+    func startUpdatingIfNeeded() {
         if settings.isWorking {
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 self?.updateCurrentStatus()
@@ -128,14 +128,28 @@ class TimeManager: ObservableObject {
     }
     
     // 停止定时更新
-    private func stopUpdating() {
+    func stopUpdating() {
         timer?.invalidate()
         timer = nil
         updateCurrentStatus()
     }
+    // 更新LiveActivity（如果需要）
+    func updateLiveActivityIfNeeded() {
+        // 尝试调用常规的更新方法
+        do {
+            LiveActivityManager.shared.updateActivity(with: settings)
+        } catch {
+            // 如果调用失败，使用替代方法
+            print("无法直接更新LiveActivity，尝试替代方法")
+            // 保存最新设置，这将触发数据更新
+            UserDefaultsManager.shared.saveUserSettings(settings)
+            // 刷新小组件时间线
+            WidgetCenter.shared.reloadAllTimelines()
+        }
+    }
     
     // 更新当前状态（工作时间和收入）
-    private func updateCurrentStatus() {
+    func updateCurrentStatus() {
         let totalSeconds = Int(settings.calculateWorkedTime())
         
         // 格式化工作时间
@@ -150,10 +164,19 @@ class TimeManager: ObservableObject {
         // 更新小组件
         WidgetCenter.shared.reloadAllTimelines()
     }
-    
-    // 更新LiveActivity（如果需要）
-    func updateLiveActivityIfNeeded() {
-        LiveActivityManager.shared.updateActivity(with: settings)
+    // 添加此方法以监听通知更新
+    func setupNotificationObserver() {
+        // 监听由ScreenStateMonitor发送的更新通知
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleLiveActivityUpdateRequest),
+            name: Notification.Name("com.wix.GoldTime.updateLiveActivity"),
+            object: nil
+        )
+    }
+    // 处理更新请求
+    @objc private func handleLiveActivityUpdateRequest(_ notification: Notification) {
+        updateLiveActivityIfNeeded()
     }
     
     // 格式化货币显示（四位小数）
