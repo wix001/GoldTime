@@ -44,7 +44,7 @@ struct HourlyWageWidgetView: View {
     
     // 主屏幕上的小组件内容 - 优化布局版本
     var smallWidgetContent: some View {
-        VStack(spacing: 4) { // 减小间距以提供更多空间
+        VStack(spacing: 4) {
             // 标题和状态在同一行，节省空间
             HStack {
                 Circle()
@@ -66,19 +66,53 @@ struct HourlyWageWidgetView: View {
             
             Spacer()
             
+            // 添加目标进度条
+            ZStack(alignment: .leading) {
+                // 背景
+                Rectangle()
+                    .fill(Color.gray.opacity(0.2))
+                    .frame(height: 6)
+                    .cornerRadius(3)
+                
+                // 进度
+                Rectangle()
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                entry.activeGoalType == .time ? Color.green.opacity(0.7) : Color(hex: 0xFFD700).opacity(0.7),
+                                entry.activeGoalType == .time ? Color.green : Color(hex: 0xFFD700)
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(min(CGFloat(entry.calculateGoalProgress()) * 130, 130), 6), height: 6)
+                    .cornerRadius(3)
+            }
+            .padding(.horizontal, 5)
+            
             // 工作时间显示在底部
-            Text(entry.workedTime)
-                .font(.caption2)
-                .foregroundColor(.gray)
-                .lineLimit(1) // 确保单行显示
+            HStack {
+                Text(entry.workedTime)
+                    .font(.caption2)
+                    .foregroundColor(.gray)
+                    .lineLimit(1) // 确保单行显示
+                
+                Spacer()
+                
+                // 显示目标类型小图标
+                Image(systemName: entry.activeGoalType == .time ? "clock" : "dollarsign.circle")
+                    .font(.caption2)
+                    .foregroundColor(entry.activeGoalType == .time ? .green : Color(hex: 0xFFD700))
+            }
         }
         .padding(10) // 减小边距以获得更多内部空间
     }
-    
-    // 锁屏上的小组件内容 - 也优化显示
+
+    // 修改锁屏小组件内容，添加目标进度显示
     var lockScreenWidgetContent: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 2) { // 减小垂直间距
+            VStack(alignment: .leading, spacing: 2) {
                 // 工作状态
                 HStack(spacing: 4) {
                     Circle()
@@ -98,6 +132,21 @@ struct HourlyWageWidgetView: View {
                     .minimumScaleFactor(0.5)  // 允许文本在必要时缩小到50%
                     .foregroundColor(.white)
                     .shadow(color: Color(hex: 0xFFD700).opacity(0.7), radius: 1, x: 0, y: 0)
+                
+                // 添加小型进度条
+                ZStack(alignment: .leading) {
+                    // 背景
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.3))
+                        .frame(height: 3)
+                        .cornerRadius(1.5)
+                    
+                    // 进度
+                    Rectangle()
+                        .fill(entry.activeGoalType == .time ? Color.green : Color(hex: 0xFFD700))
+                        .frame(width: max(min(CGFloat(entry.calculateGoalProgress()) * 60, 60), 3), height: 3)
+                        .cornerRadius(1.5)
+                }
             }
             
             Spacer()

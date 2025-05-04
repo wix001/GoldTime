@@ -11,6 +11,7 @@ struct ContentView: View {
     @EnvironmentObject var timeManager: TimeManager
     @State private var hourlyRateText: String = ""
     @State private var showInfo: Bool = false
+    @State private var showGoalSettings: Bool = false
     
     // 获取当前赚取的工资
     private var earningsText: String {
@@ -110,7 +111,64 @@ struct ContentView: View {
                     }
                     .padding(.horizontal)
                 }
-                
+                // 添加目标设置按钮
+                Button(action: {
+                    showGoalSettings.toggle()
+                }) {
+                    HStack {
+                        Image(systemName: "target")
+                            .foregroundColor(Color(hex: 0xFFD700))
+                        Text("设置工作目标")
+                            .foregroundColor(Color(hex: 0xB8860B))
+                            .fontWeight(.medium)
+                        
+                        Spacer()
+                        
+                        // 显示当前目标类型和进度
+                        Text(timeManager.getCurrentGoalDescription())
+                            .font(.caption)
+                            .foregroundColor(.gray)
+                    }
+                    .padding()
+                    .background(
+                        RoundedRectangle(cornerRadius: 10)
+                            .stroke(Color(hex: 0xDAA520), lineWidth: 2)
+                            .background(Color(hex: 0xFFF8E1).cornerRadius(10))
+                    )
+                }
+                .padding(.horizontal)
+
+                // 目标进度条
+                ZStack(alignment: .leading) {
+                    // 背景
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(height: 10)
+                        .cornerRadius(5)
+                    
+                    // 进度
+                    Rectangle()
+                        .fill(
+                            LinearGradient(
+                                gradient: Gradient(colors: [
+                                    timeManager.settings.activeGoalType == .time ? Color.green.opacity(0.7) : Color(hex: 0xFFD700).opacity(0.7),
+                                    timeManager.settings.activeGoalType == .time ? Color.green : Color(hex: 0xFFD700)
+                                ]),
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            )
+                        )
+                        .frame(width: max(min(CGFloat(timeManager.getCurrentGoalProgress()) * (UIScreen.main.bounds.width - 40), UIScreen.main.bounds.width - 40), 10), height: 10)
+                        .cornerRadius(5)
+                        .animation(.linear, value: timeManager.getCurrentGoalProgress())
+                }
+                .padding(.horizontal, 20)
+
+                // 添加目标设置的sheet
+                .sheet(isPresented: $showGoalSettings) {
+                    GoalSettingsView(timeManager: timeManager)
+                        .environmentObject(timeManager)
+                }
                 // 重启LiveActivity按钮
                 Button(action: {
                     timeManager.restartLiveActivity()

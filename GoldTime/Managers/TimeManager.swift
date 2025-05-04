@@ -152,12 +152,50 @@ class TimeManager: ObservableObject {
     }
     
     // 更新LiveActivity（如果需要）
-    private func updateLiveActivityIfNeeded() {
+    func updateLiveActivityIfNeeded() {
         LiveActivityManager.shared.updateActivity(with: settings)
     }
     
     // 格式化货币显示（四位小数）
     func formattedEarnings() -> String {
         return "\(settings.currency)\(String(format: "%.4f", currentEarnings))"
+    }
+
+    // 设置时间目标
+    func setTimeGoal(_ hours: Double) {
+        settings.timeGoal = hours
+        UserDefaultsManager.shared.saveUserSettings(settings)
+        WidgetCenter.shared.reloadAllTimelines()
+        updateLiveActivityIfNeeded()
+    }
+
+    // 设置收入目标
+    func setIncomeGoal(_ amount: Double) {
+        settings.incomeGoal = amount
+        UserDefaultsManager.shared.saveUserSettings(settings)
+        WidgetCenter.shared.reloadAllTimelines()
+        updateLiveActivityIfNeeded()
+    }
+
+    // 切换活跃的目标类型
+    func toggleGoalType() {
+        if settings.activeGoalType == .time {
+            settings.activeGoalType = .income
+        } else {
+            settings.activeGoalType = .time
+        }
+        UserDefaultsManager.shared.saveUserSettings(settings)
+        WidgetCenter.shared.reloadAllTimelines()
+        updateLiveActivityIfNeeded()
+    }
+
+    // 获取当前目标进度
+    func getCurrentGoalProgress() -> Double {
+        return settings.calculateGoalProgress()
+    }
+
+    // 获取当前目标描述
+    func getCurrentGoalDescription() -> String {
+        return settings.getGoalDescription()
     }
 }

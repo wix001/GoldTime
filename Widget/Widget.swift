@@ -35,7 +35,10 @@ struct Provider: TimelineProvider {
             workedTime: "00:00:00",
             isWorking: false,
             currency: "¥",
-            decimalPlaces: 4
+            decimalPlaces: 4,
+            timeGoal: 8.0,
+            incomeGoal: 1000.0,
+            activeGoalType: .time
         )
     }
 
@@ -57,8 +60,12 @@ struct Provider: TimelineProvider {
             workedTime: formattedWorkTime,
             isWorking: settings.isWorking,
             currency: settings.currency,
-            decimalPlaces: 4
+            decimalPlaces: 4,
+            timeGoal: settings.timeGoal,
+            incomeGoal: settings.incomeGoal,
+            activeGoalType: settings.activeGoalType
         )
+
         completion(entry)
     }
 
@@ -90,7 +97,10 @@ struct Provider: TimelineProvider {
                 workedTime: formattedWorkTime,
                 isWorking: settings.isWorking,
                 currency: settings.currency,
-                decimalPlaces: 4
+                decimalPlaces: 4,
+                timeGoal: settings.timeGoal,
+                incomeGoal: settings.incomeGoal,
+                activeGoalType: settings.activeGoalType
             )
             entries.append(entry)
         }
@@ -115,9 +125,45 @@ struct SimpleEntry: TimelineEntry {
     let currency: String
     let decimalPlaces: Int
     
+    // 新增目标相关属性
+    let timeGoal: Double
+    let incomeGoal: Double
+    let activeGoalType: GoalType
+    
     // 格式化工资显示为四位小数
     func formattedEarnings() -> String {
         let format = "%.\(decimalPlaces)f"
         return "\(currency)\(String(format: format, earnedMoney))"
+    }
+    
+    // 计算目标进度
+    func calculateGoalProgress() -> Double {
+        switch activeGoalType {
+        case .time:
+            // 解析workedTime字符串获取小时数
+            let components = workedTime.split(separator: ":")
+            if components.count == 3,
+               let hours = Double(components[0]),
+               let minutes = Double(components[1]),
+               let seconds = Double(components[2]) {
+                let totalHours = hours + minutes/60 + seconds/3600
+                return min(totalHours / timeGoal, 1.0)
+            }
+            return 0.0
+        case .income:
+            return min(earnedMoney / incomeGoal, 1.0)
+        }
+    }
+    
+    // 获取目标描述
+    func getGoalDescription() -> String {
+        switch activeGoalType {
+        case .time:
+            let hours = Int(timeGoal)
+            let minutes = Int((timeGoal - Double(hours)) * 60)
+            return String(format: "目标: %d时%02d分", hours, minutes)
+        case .income:
+            return String(format: "目标: %@%.2f", currency, incomeGoal)
+        }
     }
 }

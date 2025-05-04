@@ -77,9 +77,12 @@ class LiveActivityManager {
             hourlyRate: settings.hourlyRate,
             startTime: startTime,
             pausedTotalTime: settings.pausedTotalTime,
-            isWorking: settings.isWorking,  // 使用settings中的工作状态
+            isWorking: settings.isWorking,
             currency: settings.currency,
-            decimalPlaces: 4  // 使用4位小数
+            decimalPlaces: 4,
+            timeGoal: settings.timeGoal,
+            incomeGoal: settings.incomeGoal,
+            activeGoalType: settings.activeGoalType
         )
         
         // 创建LiveActivity
@@ -178,7 +181,10 @@ class LiveActivityManager {
             pausedTotalTime: settings.pausedTotalTime,
             isWorking: settings.isWorking,
             currency: settings.currency,
-            decimalPlaces: 4
+            decimalPlaces: 4,
+            timeGoal: settings.timeGoal,
+            incomeGoal: settings.incomeGoal,
+            activeGoalType: settings.activeGoalType
         )
         
         // 兼容不同iOS版本的更新方式
@@ -244,7 +250,10 @@ class LiveActivityManager {
             pausedTotalTime: currentState.pausedTotalTime,
             isWorking: currentState.isWorking,
             currency: currentState.currency,
-            decimalPlaces: currentState.decimalPlaces
+            decimalPlaces: currentState.decimalPlaces,
+            timeGoal: currentState.timeGoal,
+            incomeGoal: currentState.incomeGoal,
+            activeGoalType: currentState.activeGoalType
         )
         
         // 兼容不同iOS版本的更新方式

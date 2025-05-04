@@ -127,7 +127,7 @@ struct LockScreenLiveActivityView: View {
                 }
             }
             
-            // 进度条 - 改为绿色
+            // 进度条 - 根据目标类型显示进度
             ZStack(alignment: .leading) {
                 // 背景条
                 Rectangle()
@@ -135,15 +135,24 @@ struct LockScreenLiveActivityView: View {
                     .frame(height: 8)
                     .cornerRadius(4)
                 
-                // 进度指示 - 使用绿色
+                // 进度指示 - 使用渐变色，颜色根据目标类型不同而变化
                 Rectangle()
-                    .fill(Color.green)
-                    .frame(width: min(CGFloat(calculateRealTimeWorkedTime() / 3600) * 100, UIScreen.main.bounds.width - 32), height: 8)
+                    .fill(
+                        LinearGradient(
+                            gradient: Gradient(colors: [
+                                context.state.activeGoalType == .time ? Color.green.opacity(0.7) : Color(hex: 0xFFD700).opacity(0.7),
+                                context.state.activeGoalType == .time ? Color.green : Color(hex: 0xFFD700)
+                            ]),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+                    .frame(width: max(min(CGFloat(context.state.calculateGoalProgress()) * (UIScreen.main.bounds.width - 32), UIScreen.main.bounds.width - 32), 8), height: 8)
                     .cornerRadius(4)
-                    .animation(.linear, value: calculateRealTimeWorkedTime())
+                    .animation(.linear, value: context.state.calculateGoalProgress())
             }
-            
-            // 底部信息
+
+            // 替换底部信息部分，添加目标信息
             HStack {
                 Circle()
                     .fill(context.state.isWorking ? Color.green : Color.orange)
@@ -155,8 +164,8 @@ struct LockScreenLiveActivityView: View {
                 
                 Spacer()
                 
-                // 时薪信息
-                Text("时薪: \(context.state.currency)\(String(format: "%.2f", context.state.hourlyRate))")
+                // 目标信息
+                Text("\(context.state.getGoalDescription()) (\(context.state.getGoalProgressText()))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }

@@ -13,7 +13,12 @@ public struct UserSettings: Codable {
     var isWorking: Bool = false
     var startTime: Date?
     var pausedTotalTime: TimeInterval = 0.0
-    var currency: String = "¥" // 默认使用人民币符号，可以根据需要修改
+    var currency: String = "¥" // 默认使用人民币符号
+    
+    // 新增的目标设置
+    var timeGoal: Double = 8.0 // 默认目标工作时间为8小时
+    var incomeGoal: Double = 1000.0 // 默认目标收入1000元
+    var activeGoalType: GoalType = .time // 默认使用时间目标
     
     // 计算已工作的总时间
     func calculateWorkedTime(currentTime: Date = Date()) -> TimeInterval {
@@ -29,4 +34,34 @@ public struct UserSettings: Codable {
         let workedHours = calculateWorkedTime(currentTime: currentTime) / 3600
         return hourlyRate * workedHours
     }
+    
+    // 计算目标完成度（时间或收入）
+    func calculateGoalProgress(currentTime: Date = Date()) -> Double {
+        switch activeGoalType {
+        case .time:
+            let workedHours = calculateWorkedTime(currentTime: currentTime) / 3600
+            return min(workedHours / timeGoal, 1.0)
+        case .income:
+            let earned = calculateEarnedMoney(currentTime: currentTime)
+            return min(earned / incomeGoal, 1.0)
+        }
+    }
+    
+    // 获取目标说明文本
+    func getGoalDescription() -> String {
+        switch activeGoalType {
+        case .time:
+            let hours = Int(timeGoal)
+            let minutes = Int((timeGoal - Double(hours)) * 60)
+            return String(format: "目标: %d时%02d分", hours, minutes)
+        case .income:
+            return String(format: "目标: %@%.2f", currency, incomeGoal)
+        }
+    }
+}
+
+// 目标类型枚举
+public enum GoalType: String, Codable {
+    case time = "time"
+    case income = "income"
 }

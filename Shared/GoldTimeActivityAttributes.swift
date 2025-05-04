@@ -12,13 +12,17 @@ import ActivityKit
 struct GoldTimeActivityAttributes: ActivityAttributes {
     // 固定属性 - 活动一旦创建就不会改变的属性
     public struct ContentState: Codable, Hashable {
-        // 动态状态属性 - 这些属性会随着活动的更新而改变
         var hourlyRate: Double
         var startTime: Date
         var pausedTotalTime: TimeInterval
         var isWorking: Bool
         var currency: String
         var decimalPlaces: Int = 4 // 默认显示4位小数
+        
+        // 新增目标相关属性
+        var timeGoal: Double = 8.0
+        var incomeGoal: Double = 1000.0
+        var activeGoalType: GoalType = .time
         
         // 计算已工作的总时间
         func calculateWorkedTime(currentTime: Date = Date()) -> TimeInterval {
@@ -48,6 +52,35 @@ struct GoldTimeActivityAttributes: ActivityAttributes {
             let minutes = (totalSeconds % 3600) / 60
             let seconds = totalSeconds % 60
             return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+        }
+        
+        // 计算目标完成度
+        func calculateGoalProgress(currentTime: Date = Date()) -> Double {
+            switch activeGoalType {
+            case .time:
+                let workedHours = calculateWorkedTime(currentTime: currentTime) / 3600
+                return min(workedHours / timeGoal, 1.0)
+            case .income:
+                let earned = calculateEarnedMoney(currentTime: currentTime)
+                return min(earned / incomeGoal, 1.0)
+            }
+        }
+        
+        // 获取目标说明文本
+        func getGoalDescription() -> String {
+            switch activeGoalType {
+            case .time:
+                let hours = Int(timeGoal)
+                let minutes = Int((timeGoal - Double(hours)) * 60)
+                return String(format: "目标: %d时%02d分", hours, minutes)
+            case .income:
+                return String(format: "目标: %@%.2f", currency, incomeGoal)
+            }
+        }
+        
+        // 获取目标进度百分比文本
+        func getGoalProgressText(currentTime: Date = Date()) -> String {
+            return String(format: "%.0f%%", calculateGoalProgress(currentTime: currentTime) * 100)
         }
     }
     
