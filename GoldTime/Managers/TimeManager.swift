@@ -23,12 +23,14 @@ public class TimeManager: ObservableObject {
     
     @Published var currentEarnings: Double = 0.0
     @Published var formattedWorkTime: String = "00:00:00"
+    @Published var workRecords: [WorkRecord] = []
     
     private var timer: Timer?
     
     init() {
         // 从UserDefaults加载设置
         self.settings = UserDefaultsManager.shared.loadUserSettings()
+        self.workRecords = UserDefaultsManager.shared.loadWorkRecords()
         self.startUpdatingIfNeeded()
     }
     
@@ -87,14 +89,27 @@ public class TimeManager: ObservableObject {
         }
     }
     
-    // 暂停计时
+    // 暂停计时，并自动添加工作记录
     func pauseWorking() {
         if settings.isWorking {
             settings.isWorking = false
             
             // 计算已工作时间并添加到总暂停时间
             if let startTime = settings.startTime {
-                settings.pausedTotalTime += Date().timeIntervalSince(startTime)
+                let endTime = Date()
+                settings.pausedTotalTime += endTime.timeIntervalSince(startTime)
+                
+                // 添加工作记录
+                let record = WorkRecord(
+                    startDate: startTime,
+                    endDate: endTime,
+                    hourlyRate: settings.hourlyRate,
+                    currency: settings.currency
+                )
+                
+                UserDefaultsManager.shared.addWorkRecord(record)
+                workRecords = UserDefaultsManager.shared.loadWorkRecords()
+                
                 settings.startTime = nil
             }
             
@@ -220,5 +235,43 @@ public class TimeManager: ObservableObject {
     // 获取当前目标描述
     func getCurrentGoalDescription() -> String {
         return settings.getGoalDescription()
+    }
+    
+    // 添加新的工作记录
+    func addWorkRecord(_ record: WorkRecord) {
+        UserDefaultsManager.shared.addWorkRecord(record)
+        workRecords = UserDefaultsManager.shared.loadWorkRecords()
+    }
+    
+    // 删除工作记录
+    func deleteWorkRecord(withID id: UUID) {
+        UserDefaultsManager.shared.deleteWorkRecord(withID: id)
+        workRecords = UserDefaultsManager.shared.loadWorkRecords()
+    }
+    
+    // 更新工作记录
+    func updateWorkRecord(_ record: WorkRecord) {
+        UserDefaultsManager.shared.updateWorkRecord(record)
+        workRecords = UserDefaultsManager.shared.loadWorkRecords()
+    }
+    
+    // 刷新工作记录列表
+    func refreshWorkRecords() {
+        workRecords = UserDefaultsManager.shared.loadWorkRecords()
+    }
+    
+    // 计算不同货币的总收入
+    func calculateTotalEarningsByCurrency() -> [String: Double] {
+        var totalsByCurrency: [String: Double] = [:]
+        
+        for record in workRecords {
+            if let current = totalsByCurrency[record.currency] {
+                totalsByCurrency[record.currency] = current + record.earnings
+            } else {
+                totalsByCurrency[record.currency] = record.earnings
+            }
+        }
+        
+        return totalsByCurrency
     }
 }
