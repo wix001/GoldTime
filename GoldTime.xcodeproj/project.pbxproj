@@ -82,6 +82,13 @@
 			);
 			target = 6DA18A862DC5F4540032F1C2 /* WidgetExtension */;
 		};
+		6DA18B6E2DC7A4680032F1C2 /* Exceptions for "Shared" folder in "WidgetExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				BackgroundManager.swift,
+			);
+			target = 6DA18A862DC5F4540032F1C2 /* WidgetExtension */;
+		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -114,6 +121,9 @@
 		};
 		6DA18AA72DC5F56C0032F1C2 /* Shared */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6DA18B6E2DC7A4680032F1C2 /* Exceptions for "Shared" folder in "WidgetExtension" target */,
+			);
 			path = Shared;
 			sourceTree = "<group>";
 		};
@@ -703,6 +713,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = AJ8X62G5FR;
+				GCC_PREPROCESSOR_DEFINITIONS = "DEBUG=1";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Widget/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Widget;

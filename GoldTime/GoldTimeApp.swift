@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 @main
 struct GoldTimeApp: App {
@@ -20,6 +21,9 @@ struct GoldTimeApp: App {
                     // 当应用进入后台时，检查是否需要启动LiveActivity
                     if timeManager.settings.isWorking {
                         LiveActivityManager.shared.startActivity(with: timeManager.settings)
+                        
+                        // 延长后台运行时间
+                        BackgroundManager.shared.beginBackgroundTask()
                     }
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
@@ -29,6 +33,9 @@ struct GoldTimeApp: App {
                     } else if !timeManager.settings.isWorking && LiveActivityManager.shared.hasActiveActivity {
                         LiveActivityManager.shared.endActivity()
                     }
+                    
+                    // 结束后台任务
+                    BackgroundManager.shared.endBackgroundTask()
                 }
         }
     }

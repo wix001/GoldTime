@@ -21,6 +21,7 @@ struct HourlyWageWidget: Widget {
         .configurationDisplayName("工资计算器") // 小组件显示名称
         .description("实时显示您的工作收入") // 小组件描述
         .supportedFamilies([.systemSmall, .accessoryRectangular]) // 支持的尺寸，包括锁屏小组件
+        .contentMarginsDisabled() // 禁用内容边距以获得更好的显示效果
     }
 }
 
@@ -70,7 +71,7 @@ struct Provider: TimelineProvider {
         let currentDate = Date()
         let updateInterval: TimeInterval = settings.isWorking ? 1 : 60 // 工作时每秒更新，否则每分钟更新
         
-        for secondOffset in stride(from: 0, to: 30, by: updateInterval) {
+        for secondOffset in stride(from: 0, to: 180, by: updateInterval) {
             let entryDate = Calendar.current.date(byAdding: .second, value: Int(secondOffset), to: currentDate)!
             
             // 计算预计收入
@@ -94,8 +95,13 @@ struct Provider: TimelineProvider {
             entries.append(entry)
         }
 
-        // 创建时间线
-        let timeline = Timeline(entries: entries, policy: .after(Date(timeIntervalSinceNow: updateInterval)))
+        // 创建更快的刷新策略，以保持实时更新
+        // 根据工作状态决定刷新时间
+        let refreshDate = settings.isWorking
+            ? Calendar.current.date(byAdding: .second, value: 1, to: currentDate)!  // 每1秒刷新
+            : Calendar.current.date(byAdding: .minute, value: 1, to: currentDate)!  // 每1分钟刷新
+            
+        let timeline = Timeline(entries: entries, policy: .after(refreshDate))
         completion(timeline)
     }
 }

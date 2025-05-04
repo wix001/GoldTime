@@ -47,10 +47,31 @@ class TimeManager: ObservableObject {
         // 使用修改后的endAllActivities方法确保所有LiveActivity都被关闭
         LiveActivityManager.shared.endAllActivities()
         
-        // 然后强制创建一个新的LiveActivity
-        // 添加短暂延迟确保之前的活动完全结束
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            LiveActivityManager.shared.startActivity(with: self.settings, forceStart: true)
+        // 延迟确保先前的活动已完全关闭
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            // 如果处于工作状态，立即强制创建一个新的LiveActivity
+            if self.settings.isWorking {
+                LiveActivityManager.shared.startActivity(with: self.settings, forceStart: true)
+            } else {
+                // 如果不是工作状态，临时设置为工作状态，创建LiveActivity，然后恢复状态
+                let originalState = self.settings.isWorking
+                let originalStartTime = self.settings.startTime
+                
+                // 临时修改状态
+                self.settings.isWorking = true
+                self.settings.startTime = Date()
+                
+                // 创建LiveActivity
+                LiveActivityManager.shared.startActivity(with: self.settings, forceStart: true)
+                
+                // 恢复原始状态
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.settings.isWorking = originalState
+                    self.settings.startTime = originalStartTime
+                    // 更新LiveActivity状态以反映正确的工作状态
+                    LiveActivityManager.shared.updateActivity(with: self.settings)
+                }
+            }
         }
     }
     
@@ -102,6 +123,7 @@ class TimeManager: ObservableObject {
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 self?.updateCurrentStatus()
             }
+            RunLoop.current.add(timer!, forMode: .common)
         }
     }
     

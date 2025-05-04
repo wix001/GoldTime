@@ -85,12 +85,16 @@ struct WidgetLiveActivity: Widget {
             .widgetURL(URL(string: "goldtime://open"))
             .keylineTint(context.state.isWorking ? .green : Color(hex: 0xFFD700))
         }
+        .contentMarginsDisabled()
     }
 }
 
 // 锁屏界面视图
 struct LockScreenLiveActivityView: View {
     let context: ActivityViewContext<GoldTimeActivityAttributes>
+    @State private var currentTime = Date()
+    // 使用计时器来更新当前时间
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
     var body: some View {
         VStack(spacing: 12) {
@@ -104,7 +108,7 @@ struct LockScreenLiveActivityView: View {
                     }
                     
                     // 收入金额 - 金色金属风格，左对齐，无背景
-                    GoldMetalText(text: context.state.formattedEarnings(), fontSize: 28)
+                    GoldMetalText(text: getRealTimeEarnings(), fontSize: 28)
                         .padding(.vertical, 8)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
@@ -117,7 +121,7 @@ struct LockScreenLiveActivityView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    Text(context.state.formattedWorkTime())
+                    Text(getRealTimeWorkTime())
                         .font(.callout)
                         .bold()
                 }
@@ -133,16 +137,10 @@ struct LockScreenLiveActivityView: View {
                 
                 // 进度指示 - 使用绿色
                 Rectangle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color.green.opacity(0.7), Color.green]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: min(CGFloat(context.state.calculateWorkedTime() / 3600) * 100, UIScreen.main.bounds.width - 32), height: 8)
+                    .fill(Color.green)
+                    .frame(width: min(CGFloat(calculateRealTimeWorkedTime() / 3600) * 100, UIScreen.main.bounds.width - 32), height: 8)
                     .cornerRadius(4)
-                    .animation(.linear, value: context.state.calculateWorkedTime())
+                    .animation(.linear, value: calculateRealTimeWorkedTime())
             }
             
             // 底部信息
@@ -164,52 +162,61 @@ struct LockScreenLiveActivityView: View {
             }
         }
         .padding(16)
+        .onReceive(timer) { _ in
+            currentTime = Date()
+        }
+    }
+    
+    // 实时计算当前工作时间（考虑当前时间）
+    private func calculateRealTimeWorkedTime() -> TimeInterval {
+        guard context.state.isWorking else {
+            return context.state.pausedTotalTime
+        }
+        
+        return context.state.pausedTotalTime + currentTime.timeIntervalSince(context.state.startTime)
+    }
+    
+    // 实时获取工作时间
+    private func getRealTimeWorkTime() -> String {
+        let totalSeconds = Int(calculateRealTimeWorkedTime())
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+    
+    // 实时计算收入
+    private func getRealTimeEarnings() -> String {
+        let workedHours = calculateRealTimeWorkedTime() / 3600
+        let earnings = context.state.hourlyRate * workedHours
+        
+        let format = "%.\(context.state.decimalPlaces)f"
+        return "\(context.state.currency)\(String(format: format, earnings))"
     }
 }
 
-// 金色金属文字组件 - 增强版
+// 金色金属文字组件 - 完全简化版
 struct GoldMetalText: View {
     let text: String
     let fontSize: CGFloat
-    @State private var phase: CGFloat = 0
-    @State private var glintPhase: CGFloat = 0
     
     var body: some View {
         ZStack {
             // 主要金色文字层
             Text(text)
                 .font(.system(size: fontSize, weight: .heavy))
-                .foregroundStyle(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                          Color(hex: 0xFFE1A3), // 暖金色过渡
-                          Color(hex: 0xFFD700), // 亮金色（标准金）
-                          Color(hex: 0xFFE1A3), // 回到暖金色
-                        ]),
-                        startPoint: UnitPoint(x: phase, y: 0),
-                        endPoint: UnitPoint(x: phase + 0.8, y: 1)
-                    )
-                )
+                .foregroundColor(Color(hex: 0xFFD700))
                 .shadow(color: .yellow.opacity(0.4), radius: 1, x: 0, y: 0)
                 
             // 镜面金属效果 - 更宽的闪光
             Text(text)
                 .font(.system(size: fontSize, weight: .heavy))
-                .foregroundStyle(
-                    LinearGradient(
-                        gradient: Gradient(colors: [
-                            .white.opacity(0),
-                            .white.opacity(0.95),
-                            .white.opacity(0)
-                        ]),
-                        startPoint: UnitPoint(x: phase, y: 0),
-                        endPoint: UnitPoint(x: phase + 0.2, y: 1)
-                    )
-                )
+                .foregroundColor(Color.white.opacity(0.5))
+                .blur(radius: 0.5)
+                .offset(x: 0.5, y: 0.5)
         }
     }
 }
-
 
 // 颜色扩展，支持十六进制颜色
 extension Color {

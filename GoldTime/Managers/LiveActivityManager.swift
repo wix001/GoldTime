@@ -8,10 +8,18 @@
 import Foundation
 import ActivityKit
 import SwiftUI
+import WidgetKit
 
 // LiveActivity管理器，负责创建、更新和结束LiveActivity
 class LiveActivityManager {
-    static let shared = LiveActivityManager()
+    // 使用静态属性而不是shared单例模式
+    private static var _shared: LiveActivityManager?
+    static var shared: LiveActivityManager {
+        if _shared == nil {
+            _shared = LiveActivityManager()
+        }
+        return _shared!
+    }
     
     private var activity: Activity<GoldTimeActivityAttributes>?
     private var updateTimer: Timer?
@@ -76,18 +84,31 @@ class LiveActivityManager {
         
         // 创建LiveActivity
         do {
-            activity = try Activity.request(
-                attributes: attributes,
-                contentState: state,
-                pushType: nil
-            )
+            // 兼容不同iOS版本的Activity请求
+            if #available(iOS 16.2, *) {
+                // iOS 16.2及更高版本
+                activity = try Activity.request(
+                    attributes: attributes,
+                    content: .init(state: state, staleDate: .distantFuture),
+                    pushType: nil
+                )
+            } else {
+                // iOS 16.1
+                activity = try Activity.request(
+                    attributes: attributes,
+                    contentState: state,
+                    pushType: nil
+                )
+            }
+            
+            print("LiveActivity创建成功: \(self.activity?.id ?? "未知")")
             
             // 如果当前是工作状态，启动定时器
             if settings.isWorking {
                 startUpdateTimer()
             }
         } catch {
-            print("Error starting live activity: \(error.localizedDescription)")
+            print("创建LiveActivity出错: \(error.localizedDescription)")
         }
     }
     
@@ -116,13 +137,36 @@ class LiveActivityManager {
     
     // 更新LiveActivity
     func updateActivity(with settings: UserSettings) {
-        guard let activity = activity, activity.activityState != .ended else {
+        guard isSupported else { return }
+        
+        if activity == nil || activity?.activityState == .ended {
             // 如果没有活动的LiveActivity且正在工作，创建新的
             if settings.isWorking {
                 startActivity(with: settings)
             }
             return
         }
+        
+        updateActivityContent(with: settings)
+    }
+    
+    // 从后台更新LiveActivity
+    func updateActivityFromBackground(with settings: UserSettings) {
+        // 确保我们在后台线程上
+        DispatchQueue.global(qos: .background).async {
+            // 更新Activity内容
+            self.updateActivityContent(with: settings)
+            
+            // 强制更新小组件
+            DispatchQueue.main.async {
+                WidgetCenter.shared.reloadAllTimelines()
+            }
+        }
+    }
+    
+    // 更新LiveActivity内容
+    private func updateActivityContent(with settings: UserSettings) {
+        guard let activity = activity, activity.activityState != .ended else { return }
         
         // 获取合适的起始时间
         let startTime = settings.startTime ?? Date()
@@ -132,13 +176,20 @@ class LiveActivityManager {
             hourlyRate: settings.hourlyRate,
             startTime: startTime,
             pausedTotalTime: settings.pausedTotalTime,
-            isWorking: settings.isWorking,  // 传递当前工作状态
+            isWorking: settings.isWorking,
             currency: settings.currency,
-            decimalPlaces: 4  // 使用4位小数
+            decimalPlaces: 4
         )
         
+        // 兼容不同iOS版本的更新方式
         Task {
-            await activity.update(using: updatedState)
+            if #available(iOS 16.2, *) {
+                // iOS 16.2及更高版本
+                await activity.update(.init(state: updatedState, staleDate: .distantFuture))
+            } else {
+                // iOS 16.1
+                await activity.update(using: updatedState)
+            }
         }
         
         // 根据工作状态管理定时器
@@ -161,9 +212,14 @@ class LiveActivityManager {
         // 停止当前的定时器（如果有）
         stopUpdateTimer()
         
-        // 创建新的每秒更新定时器
-        updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-            self?.updateCurrentActivity()
+        // 创建新的每秒更新定时器，确保在主线程中
+        DispatchQueue.main.async {
+            self.updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
+                self?.updateCurrentActivity()
+            }
+            
+            // 确保定时器在后台也能运行
+            RunLoop.current.add(self.updateTimer!, forMode: .common)
         }
     }
     
@@ -191,8 +247,15 @@ class LiveActivityManager {
             decimalPlaces: currentState.decimalPlaces
         )
         
+        // 兼容不同iOS版本的更新方式
         Task {
-            await activity.update(using: updatedState)
+            if #available(iOS 16.2, *) {
+                // iOS 16.2及更高版本
+                await activity.update(.init(state: updatedState, staleDate: .distantFuture))
+            } else {
+                // iOS 16.1
+                await activity.update(using: updatedState)
+            }
         }
     }
 }
