@@ -41,8 +41,10 @@ struct WidgetLiveActivity: Widget {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    // 收入金额（金色金属风格）
-                    GoldMetalText(text: context.state.formattedEarnings(), fontSize: 24)
+                    // 收入金额
+                    Text(context.state.formattedEarnings())
+                        .font(.system(size: 24, weight: .bold))
+                        .foregroundColor(context.state.isWorking ? Color(hex: 0xFFD700) : Color.secondary)
                 }
                 
                 DynamicIslandExpandedRegion(.bottom) {
@@ -76,11 +78,13 @@ struct WidgetLiveActivity: Widget {
                 }
             } compactTrailing: {
                 // 动态岛右侧紧凑视图
-                GoldMetalText(text: context.state.formattedEarnings(), fontSize: 12)
+                Text(context.state.formattedEarnings())
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundColor(context.state.isWorking ? Color(hex: 0xFFD700) : Color.secondary)
             } minimal: {
                 // 动态岛最小化视图
                 Image(systemName: context.state.isWorking ? "dollarsign.circle.fill" : "dollarsign.circle")
-                    .foregroundColor(context.state.isWorking ? .green : Color(hex: 0xFFD700)) // 使用金色
+                    .foregroundColor(context.state.isWorking ? .green : Color(hex: 0xFFD700))
             }
             .widgetURL(URL(string: "goldtime://open"))
             .keylineTint(context.state.isWorking ? .green : Color(hex: 0xFFD700))
@@ -93,6 +97,8 @@ struct WidgetLiveActivity: Widget {
 struct LockScreenLiveActivityView: View {
     let context: ActivityViewContext<GoldTimeActivityAttributes>
     @State private var currentTime = Date()
+    @Environment(\.colorScheme) var colorScheme
+    
     // 使用计时器来更新当前时间
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
     
@@ -107,9 +113,13 @@ struct LockScreenLiveActivityView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // 收入金额 - 金色金属风格，左对齐，无背景
-                    GoldMetalText(text: getRealTimeEarnings(), fontSize: 28)
-                        .padding(.vertical, 8)
+                    // 收入金额
+                    Text(getRealTimeEarnings())
+                        .font(.system(size: 28, weight: .bold))
+                        .foregroundColor(context.state.isWorking ?
+                                         (colorScheme == .dark ? Color(hex: 0xFFD700) : Color(hex: 0xB8860B)) :
+                                         Color.secondary)
+                        .padding(.vertical, 6)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 
@@ -128,39 +138,21 @@ struct LockScreenLiveActivityView: View {
             }
             
             // 进度条 - 根据目标类型显示进度
-            ZStack(alignment: .leading) {
-                // 背景条
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .frame(height: 8)
-                    .cornerRadius(4)
-                
-                // 进度指示 - 使用渐变色，颜色根据目标类型不同而变化
-                Rectangle()
-                    .fill(
-                        LinearGradient(
-                            gradient: Gradient(colors: [
-                                context.state.activeGoalType == .time ? Color.green.opacity(0.7) : Color(hex: 0xFFD700).opacity(0.7),
-                                context.state.activeGoalType == .time ? Color.green : Color(hex: 0xFFD700)
-                            ]),
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-                    .frame(width: max(min(CGFloat(context.state.calculateGoalProgress()) * (UIScreen.main.bounds.width - 32), UIScreen.main.bounds.width - 32), 8), height: 8)
-                    .cornerRadius(4)
-                    .animation(.linear, value: context.state.calculateGoalProgress())
-            }
+            ProgressView(value: context.state.calculateGoalProgress())
+                .progressViewStyle(LinearProgressViewStyle(tint: context.state.activeGoalType == .time ? .green : Color(hex: 0xFFD700)))
+                .padding(.vertical, 4)
 
-            // 替换底部信息部分，添加目标信息
+            // 底部信息部分
             HStack {
-                Circle()
-                    .fill(context.state.isWorking ? Color.green : Color.orange)
-                    .frame(width: 8, height: 8)
-                // 状态文本
-                Text(context.state.isWorking ? "正在赚钱💰" : "休息一下😴")
-                    .font(.caption)
-                    .foregroundColor(context.state.isWorking ? .green : .orange)
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(context.state.isWorking ? Color.green : Color.orange)
+                        .frame(width: 8, height: 8)
+                    // 状态文本
+                    Text(context.state.isWorking ? "工作中" : "已暂停")
+                        .font(.caption)
+                        .foregroundColor(context.state.isWorking ? .green : .orange)
+                }
                 
                 Spacer()
                 
@@ -204,29 +196,6 @@ struct LockScreenLiveActivityView: View {
     }
 }
 
-// 金色金属文字组件 - 完全简化版
-struct GoldMetalText: View {
-    let text: String
-    let fontSize: CGFloat
-    
-    var body: some View {
-        ZStack {
-            // 主要金色文字层
-            Text(text)
-                .font(.system(size: fontSize, weight: .heavy))
-                .foregroundColor(Color(hex: 0xFFD700))
-                .shadow(color: .yellow.opacity(0.4), radius: 1, x: 0, y: 0)
-                
-            // 镜面金属效果 - 更宽的闪光
-            Text(text)
-                .font(.system(size: fontSize, weight: .heavy))
-                .foregroundColor(Color.white.opacity(0.5))
-                .blur(radius: 0.5)
-                .offset(x: 0.5, y: 0.5)
-        }
-    }
-}
-
 // 颜色扩展，支持十六进制颜色
 extension Color {
     init(hex: UInt, alpha: Double = 1) {
@@ -255,7 +224,7 @@ extension GoldTimeActivityAttributes.ContentState {
             pausedTotalTime: 0,
             isWorking: true,
             currency: "¥",
-            decimalPlaces: 4
+            decimalPlaces: 2
         )
      }
      
@@ -266,7 +235,7 @@ extension GoldTimeActivityAttributes.ContentState {
             pausedTotalTime: 1800, // 半小时的暂停时间
             isWorking: false,
             currency: "¥",
-            decimalPlaces: 4
+            decimalPlaces: 2
         )
      }
 }

@@ -2,13 +2,6 @@
 //  ColorExtension.swift
 //  GoldTime
 //
-//  Created by 徐蔚起 on 04/05/2025.
-//
-
-//
-//  ColorExtension.swift
-//  GoldTime
-//
 //  Created on 04/05/2025.
 //
 
@@ -25,4 +18,13 @@ extension Color {
             opacity: alpha
         )
     }
+    
+    // 定义应用中使用的颜色主题
+    static let primaryGold = Color(hex: 0xD4AF37)
+    static let darkBlueGray = Color(hex: 0x445566)
+    static let lightBackground = Color(hex: 0xF8F9FA)
+    static let fieldBackground = Color(hex: 0xF5F5F5)
+    static let successGreen = Color(hex: 0x2E8B57)
+    static let warningAmber = Color(hex: 0xFFBF00)
+    static let errorRed = Color(hex: 0x9B2226)
 }

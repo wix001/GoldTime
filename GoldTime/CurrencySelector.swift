@@ -4,44 +4,41 @@
 //
 //  Created by 徐蔚起 on 03/05/2025.
 //
-//
-//  CurrencySelector.swift
-//  GoldTime
-//
-//  Created on 03/05/2025.
-//
 
 import SwiftUI
 
 struct CurrencySelector: View {
     @EnvironmentObject var timeManager: TimeManager
     @State private var showSelector = false
-    
-    // 可选货币类型
+    @Environment(\.colorScheme) var colorScheme
+
+    // 可选货币类型（使用唯一 ID）
     private let currencies = [
-        Currency(symbol: "¥", name: "人民币"),
-        Currency(symbol: "£", name: "英镑"),
-        Currency(symbol: "$", name: "美元"),
-        Currency(symbol: "€", name: "欧元"),
-        Currency(symbol: "¥", name: "日元")
+        Currency(id: "CNY", symbol: "¥", name: "人民币"),
+        Currency(id: "GBP", symbol: "£", name: "英镑"),
+        Currency(id: "USD", symbol: "$", name: "美元"),
+        Currency(id: "EUR", symbol: "€", name: "欧元"),
+        Currency(id: "JPY", symbol: "¥", name: "日元")
     ]
-    
+
     var body: some View {
-        VStack(alignment: .leading) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("货币类型")
                     .font(.headline)
-                
+                    .foregroundColor(.primary)
+
                 Spacer()
-                
+
                 Button(action: {
-                    showSelector.toggle()
+                    withAnimation {
+                        showSelector.toggle()
+                    }
                 }) {
                     HStack {
                         Text(timeManager.settings.currency)
-                            .font(.headline)
                             .foregroundColor(.primary)
-                        
+
                         Image(systemName: "chevron.down")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -51,36 +48,38 @@ struct CurrencySelector: View {
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 8)
-                            .fill(Color(.systemGray6))
+                            .fill(Color(.tertiarySystemBackground))
                     )
                 }
             }
             .padding(.horizontal)
-            
+
             if showSelector {
                 VStack(spacing: 0) {
-                    ForEach(currencies, id: \.symbol) { currency in
+                    ForEach(currencies) { currency in
                         Button(action: {
                             timeManager.setCurrency(currency.symbol)
-                            showSelector = false
+                            withAnimation {
+                                showSelector = false
+                            }
                         }) {
                             HStack {
                                 Text("\(currency.symbol) \(currency.name)")
                                     .padding(.vertical, 10)
-                                
+                                    .foregroundColor(.primary)
+
                                 Spacer()
-                                
+
                                 if timeManager.settings.currency == currency.symbol {
                                     Image(systemName: "checkmark")
-                                        .foregroundColor(.blue)
+                                        .foregroundColor(.accentColor)
                                 }
                             }
                             .padding(.horizontal)
                             .contentShape(Rectangle())
                         }
-                        .foregroundColor(.primary)
-                        
-                        if currency.symbol != currencies.last?.symbol {
+
+                        if currency.id != currencies.last?.id {
                             Divider()
                                 .padding(.leading)
                         }
@@ -88,19 +87,36 @@ struct CurrencySelector: View {
                 }
                 .background(
                     RoundedRectangle(cornerRadius: 10)
-                        .fill(Color(.systemBackground))
-                        .shadow(color: .gray.opacity(0.2), radius: 5)
+                        .fill(Color(.secondarySystemBackground))
                 )
                 .padding(.horizontal)
                 .transition(.opacity)
-                .animation(.easeInOut(duration: 0.2), value: showSelector)
             }
         }
     }
 }
 
-// 货币模型
-struct Currency {
+// MARK: - Currency 模型，遵循 Identifiable
+struct Currency: Identifiable {
+    let id: String     // 确保唯一
     let symbol: String
     let name: String
 }
+
+struct CurrencySelector_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            CurrencySelector()
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.light)
+
+            CurrencySelector()
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.dark)
+        }
+        .previewLayout(.sizeThatFits)
+        .padding()
+        .background(Color(.systemBackground))
+    }
+}
+

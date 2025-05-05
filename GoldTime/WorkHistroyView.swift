@@ -1,14 +1,8 @@
 //
-//  WorkHistroyView.swift
-//  GoldTime
-//
-//  Created by 徐蔚起 on 04/05/2025.
-//
-//
 //  WorkHistoryView.swift
 //  GoldTime
 //
-//  Created on 04/05/2025.
+//  Created by 徐蔚起 on 04/05/2025.
 //
 
 import SwiftUI
@@ -21,6 +15,7 @@ struct WorkHistoryView: View {
     @State private var startFilterDate = Calendar.current.date(byAdding: .month, value: -1, to: Date()) ?? Date()
     @State private var endFilterDate = Date()
     @State private var isFilterActive = false
+    @Environment(\.colorScheme) var colorScheme
     
     private var filteredRecords: [WorkRecord] {
         if !isFilterActive {
@@ -48,150 +43,163 @@ struct WorkHistoryView: View {
     
     var body: some View {
         NavigationView {
-            VStack {
-                // 总收入统计卡片
-                VStack {
-                    Text("总收入统计")
-                        .font(.headline)
-                        .padding(.top)
+            ZStack {
+                Color(UIColor.systemBackground)
+                    .ignoresSafeArea()
+                
+                VStack(spacing: 12) {
+                    // 总收入统计卡片
+                    VStack(spacing: 10) {
+                        Text("总收入统计")
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .padding(.top, 8)
+                        
+                        ForEach(totalEarnings.sorted(by: { $0.key < $1.key }), id: \.key) { currency, amount in
+                            HStack {
+                                Text("\(currency):")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                
+                                Spacer()
+                                
+                                Text("\(currency)\(String(format: "%.2f", amount))")
+                                    .font(.title3)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.primary)
+                            }
+                            .padding(.horizontal)
+                            .padding(.vertical, 4)
+                        }
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.secondarySystemBackground))
+                    )
+                    .padding(.horizontal)
                     
-                    ForEach(totalEarnings.sorted(by: { $0.key < $1.key }), id: \.key) { currency, amount in
+                    // 筛选按钮
+                    Button(action: {
+                        withAnimation {
+                            showDateFilter.toggle()
+                        }
+                    }) {
                         HStack {
-                            Text("\(currency):")
-                                .font(.subheadline)
+                            Image(systemName: "line.3.horizontal.decrease.circle")
+                                .foregroundColor(.accentColor)
+                            Text(isFilterActive ? "筛选中: \(formatDate(startFilterDate)) - \(formatDate(endFilterDate))" : "筛选日期范围")
+                                .foregroundColor(isFilterActive ? .primary : .secondary)
+                            Spacer()
+                            Image(systemName: "chevron.down")
                                 .foregroundColor(.secondary)
+                                .rotationEffect(Angle(degrees: showDateFilter ? 180 : 0))
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color(.tertiarySystemBackground))
+                        )
+                    }
+                    .padding(.horizontal)
+                    
+                    if showDateFilter {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("开始日期")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                DatePicker("", selection: $startFilterDate, displayedComponents: .date)
+                                    .labelsHidden()
+                            }
                             
                             Spacer()
                             
-                            Text("\(currency)\(String(format: "%.2f", amount))")
-                                .font(.title3)
-                                .fontWeight(.bold)
-                                .foregroundColor(Color(hex: 0xB8860B))
-                        }
-                        .padding(.horizontal)
-                        .padding(.vertical, 4)
-                    }
-                }
-                .padding()
-                .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(
-                            LinearGradient(
-                                gradient: Gradient(colors: [Color(hex: 0xFFF8E1), Color(hex: 0xFFF8DC)]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                        )
-                        .shadow(color: .gray.opacity(0.3), radius: 3)
-                )
-                .padding()
-                
-                // 筛选按钮
-                Button(action: {
-                    showDateFilter.toggle()
-                }) {
-                    HStack {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
-                            .foregroundColor(Color(hex: 0xDAA520))
-                        Text(isFilterActive ? "筛选中: \(formatDate(startFilterDate)) - \(formatDate(endFilterDate))" : "筛选日期范围")
-                            .foregroundColor(isFilterActive ? .primary : Color(hex: 0xB8860B))
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .foregroundColor(.secondary)
-                            .rotationEffect(Angle(degrees: showDateFilter ? 180 : 0))
-                    }
-                    .padding()
-                    .background(
-                        RoundedRectangle(cornerRadius: 10)
-                            .stroke(Color(hex: 0xDAA520), lineWidth: 1)
-                            .background(isFilterActive ? Color(hex: 0xFFF8E1).cornerRadius(10) : Color(.systemBackground).cornerRadius(10))
-                    )
-                }
-                .padding(.horizontal)
-                
-                if showDateFilter {
-                    HStack {
-                        VStack {
-                            Text("开始日期")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            DatePicker("", selection: $startFilterDate, displayedComponents: .date)
-                                .labelsHidden()
-                        }
-                        
-                        VStack {
-                            Text("结束日期")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            DatePicker("", selection: $endFilterDate, displayedComponents: .date)
-                                .labelsHidden()
-                        }
-                        
-                        Button(action: {
-                            isFilterActive = true
-                            showDateFilter = false
-                        }) {
-                            Text("应用")
-                                .font(.caption)
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 6)
-                                .background(Color(hex: 0xDAA520))
-                                .foregroundColor(.white)
-                                .cornerRadius(6)
-                        }
-                        
-                        if isFilterActive {
-                            Button(action: {
-                                isFilterActive = false
-                                showDateFilter = false
-                            }) {
-                                Text("清除")
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("结束日期")
                                     .font(.caption)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color.red)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(6)
+                                    .foregroundColor(.secondary)
+                                DatePicker("", selection: $endFilterDate, displayedComponents: .date)
+                                    .labelsHidden()
+                            }
+                            
+                            Spacer()
+                            
+                            VStack {
+                                Button(action: {
+                                    isFilterActive = true
+                                    showDateFilter = false
+                                }) {
+                                    Text("应用")
+                                        .font(.footnote)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(Color.accentColor)
+                                        .foregroundColor(.white)
+                                        .cornerRadius(6)
+                                }
+                                
+                                if isFilterActive {
+                                    Button(action: {
+                                        isFilterActive = false
+                                        showDateFilter = false
+                                    }) {
+                                        Text("清除")
+                                            .font(.footnote)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 6)
+                                            .background(Color(.systemRed))
+                                            .foregroundColor(.white)
+                                            .cornerRadius(6)
+                                    }
+                                    .padding(.top, 4)
+                                }
                             }
                         }
+                        .padding(.horizontal)
+                        .transition(.opacity)
                     }
-                    .padding(.horizontal)
-                    .transition(.opacity)
-                    .animation(.easeInOut(duration: 0.2), value: showDateFilter)
-                }
-                
-                // 历史记录列表
-                if filteredRecords.isEmpty {
-                    VStack {
+                    
+                    // 历史记录列表
+                    if filteredRecords.isEmpty {
                         Spacer()
-                        Text("暂无打工记录")
-                            .foregroundColor(.secondary)
-                        if isFilterActive {
-                            Text("尝试清除或修改日期筛选")
-                                .font(.caption)
+                        VStack {
+                            Image(systemName: "doc.text.magnifyingglass")
+                                .font(.system(size: 48))
                                 .foregroundColor(.secondary)
-                                .padding(.top, 4)
+                                .padding()
+                            
+                            Text("暂无打工记录")
+                                .foregroundColor(.secondary)
+                            
+                            if isFilterActive {
+                                Text("尝试清除或修改日期筛选")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                    .padding(.top, 4)
+                            }
                         }
                         Spacer()
-                    }
-                } else {
-                    List {
-                        ForEach(filteredRecords) { record in
-                            WorkRecordCell(record: record)
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    editingRecord = record
-                                }
-                                .swipeActions(edge: .trailing) {
-                                    Button(role: .destructive) {
-                                        timeManager.deleteWorkRecord(withID: record.id)
-                                    } label: {
-                                        Label("删除", systemImage: "trash")
+                    } else {
+                        List {
+                            ForEach(filteredRecords) { record in
+                                WorkRecordCell(record: record)
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        editingRecord = record
                                     }
-                                }
+                                    .swipeActions(edge: .trailing) {
+                                        Button(role: .destructive) {
+                                            timeManager.deleteWorkRecord(withID: record.id)
+                                        } label: {
+                                            Label("删除", systemImage: "trash")
+                                        }
+                                    }
+                            }
                         }
+                        .listStyle(InsetGroupedListStyle())
                     }
-                    .listStyle(InsetGroupedListStyle())
                 }
             }
             .navigationTitle("打工历史")
@@ -200,7 +208,6 @@ struct WorkHistoryView: View {
                     showAddRecord = true
                 }) {
                     Image(systemName: "plus")
-                        .foregroundColor(Color(hex: 0xDAA520))
                 }
             )
             .sheet(isPresented: $showAddRecord) {
@@ -215,6 +222,7 @@ struct WorkHistoryView: View {
                 timeManager.refreshWorkRecords()
             }
         }
+        .accentColor(colorScheme == .dark ? Color(hex: 0xFFD700) : Color(hex: 0xB8860B))
     }
     
     private func formatDate(_ date: Date) -> String {
@@ -228,9 +236,10 @@ struct WorkHistoryView: View {
 // 工作记录单元格
 struct WorkRecordCell: View {
     let record: WorkRecord
+    @Environment(\.colorScheme) var colorScheme
     
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text(formatDate(record.startDate))
                     .font(.subheadline)
@@ -259,8 +268,7 @@ struct WorkRecordCell: View {
                 
                 Text(record.formattedEarnings)
                     .font(.headline)
-                    .foregroundColor(Color(hex: 0xB8860B))
-                    .fontWeight(.bold)
+                    .foregroundColor(colorScheme == .dark ? Color(hex: 0xFFD700) : Color(hex: 0xB8860B))
             }
             
             if let note = record.note, !note.isEmpty {
@@ -272,7 +280,6 @@ struct WorkRecordCell: View {
             }
         }
         .padding(.vertical, 6)
-        .background(Color(.systemBackground))
     }
     
     private func formatDate(_ date: Date) -> String {
@@ -280,5 +287,19 @@ struct WorkRecordCell: View {
         formatter.dateStyle = .short
         formatter.timeStyle = .short
         return formatter.string(from: date)
+    }
+}
+
+struct WorkHistoryView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            WorkHistoryView()
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.light)
+            
+            WorkHistoryView()
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.dark)
+        }
     }
 }

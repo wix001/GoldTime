@@ -1,14 +1,8 @@
 //
-//  WorkHistroyEditView.swift
-//  GoldTime
-//
-//  Created by 徐蔚起 on 04/05/2025.
-//
-//
 //  WorkRecordEditView.swift
 //  GoldTime
 //
-//  Created on 04/05/2025.
+//  Created by 徐蔚起 on 04/05/2025.
 //
 
 import SwiftUI
@@ -16,6 +10,7 @@ import SwiftUI
 struct WorkRecordEditView: View {
     @Environment(\.presentationMode) var presentationMode
     @EnvironmentObject var timeManager: TimeManager
+    @Environment(\.colorScheme) var colorScheme
     
     var isNewRecord: Bool
     var existingRecord: WorkRecord?
@@ -26,13 +21,13 @@ struct WorkRecordEditView: View {
     @State private var selectedCurrency: String
     @State private var note: String
     
-    // 可选货币类型
+    // 可选货币类型（使用唯一 ID）
     private let currencies = [
-        Currency(symbol: "¥", name: "人民币"),
-        Currency(symbol: "£", name: "英镑"),
-        Currency(symbol: "$", name: "美元"),
-        Currency(symbol: "€", name: "欧元"),
-        Currency(symbol: "¥", name: "日元")
+        Currency(id: "CNY", symbol: "¥", name: "人民币"),
+        Currency(id: "GBP", symbol: "£", name: "英镑"),
+        Currency(id: "USD", symbol: "$", name: "美元"),
+        Currency(id: "EUR", symbol: "€", name: "欧元"),
+        Currency(id: "JPY", symbol: "¥", name: "日元")
     ]
     
     // 初始化方法
@@ -49,59 +44,66 @@ struct WorkRecordEditView: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("时间信息")) {
-                    DatePicker("开始时间", selection: $startDate)
-                    DatePicker("结束时间", selection: $endDate)
-                    
-                    VStack(alignment: .leading) {
-                        Text("工作时长")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                        
-                        Text(formattedDuration)
-                            .font(.headline)
-                            .foregroundColor(.primary)
-                    }
-                }
+            ZStack {
+                Color(UIColor.systemBackground)
+                    .ignoresSafeArea()
                 
-                Section(header: Text("收入信息")) {
-                    HStack {
-                        Text("时薪")
-                        TextField("输入时薪", text: $hourlyRate)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    Picker("货币类型", selection: $selectedCurrency) {
-                        ForEach(currencies, id: \.symbol) { currency in
-                            Text("\(currency.symbol) \(currency.name)")
-                                .tag(currency.symbol)
+                Form {
+                    Section(header: Text("时间信息")) {
+                        DatePicker("开始时间", selection: $startDate)
+                        DatePicker("结束时间", selection: $endDate)
+                        
+                        HStack {
+                            Text("工作时长")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(formattedDuration)
+                                .foregroundColor(.primary)
                         }
                     }
                     
-                    VStack(alignment: .leading) {
-                        Text("预计收入")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
+                    Section(header: Text("收入信息")) {
+                        HStack {
+                            Text("时薪")
+                            Spacer()
+                            TextField("输入时薪", text: $hourlyRate)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                        }
                         
-                        Text(formattedEarnings)
-                            .font(.headline)
-                            .foregroundColor(Color(hex: 0xB8860B))
-                            .fontWeight(.bold)
+                        Picker("货币类型", selection: $selectedCurrency) {
+                            ForEach(currencies, id: \.symbol) { currency in
+                                Text("\(currency.symbol) \(currency.name)")
+                                    .tag(currency.symbol)
+                            }
+                        }
+                        
+                        HStack {
+                            Text("预计收入")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text(formattedEarnings)
+                                .foregroundColor(colorScheme == .dark ? Color(hex: 0xFFD700) : Color(hex: 0xB8860B))
+                        }
                     }
-                }
-                
-                Section(header: Text("备注")) {
-                    TextField("添加备注（可选）", text: $note)
-                        .frame(height: 80)
-                }
-                
-                Section {
-                    Button(action: saveRecord) {
-                        Text(isNewRecord ? "添加记录" : "保存修改")
-                            .frame(maxWidth: .infinity)
-                            .foregroundColor(Color(hex: 0xB8860B))
+                    
+                    Section(header: Text("备注")) {
+                        TextField("添加备注（可选）", text: $note)
+                            .frame(height: 80)
+                    }
+                    
+                    Section {
+                        Button(action: saveRecord) {
+                            HStack {
+                                Spacer()
+                                Text(isNewRecord ? "添加记录" : "保存修改")
+                                    .foregroundColor(.white)
+                                    .padding(.vertical, 10)
+                                Spacer()
+                            }
+                            .background(Color.accentColor)
+                            .cornerRadius(8)
+                        }
                     }
                 }
             }
@@ -111,6 +113,7 @@ struct WorkRecordEditView: View {
                     presentationMode.wrappedValue.dismiss()
                 }
             )
+            .accentColor(colorScheme == .dark ? Color(hex: 0xFFD700) : Color(hex: 0xB8860B))
         }
     }
     
@@ -155,5 +158,19 @@ struct WorkRecordEditView: View {
         }
         
         presentationMode.wrappedValue.dismiss()
+    }
+}
+
+struct WorkRecordEditView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            WorkRecordEditView(isNewRecord: true, record: nil)
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.light)
+            
+            WorkRecordEditView(isNewRecord: true, record: nil)
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.dark)
+        }
     }
 }

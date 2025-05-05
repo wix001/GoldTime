@@ -10,6 +10,7 @@ import SwiftUI
 struct GoalSettingsView: View {
     @EnvironmentObject var timeManager: TimeManager
     @Environment(\.presentationMode) var presentationMode
+    @Environment(\.colorScheme) var colorScheme
     
     @State private var timeGoalHours: Double
     @State private var timeGoalMinutes: Double
@@ -31,55 +32,105 @@ struct GoalSettingsView: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("目标类型")) {
-                    Picker("目标类型", selection: $selectedGoalType) {
-                        Text("时间目标").tag(GoalType.time)
-                        Text("收入目标").tag(GoalType.income)
-                    }
-                    .pickerStyle(SegmentedPickerStyle())
-                    .onChange(of: selectedGoalType) { newValue in
-                        timeManager.settings.activeGoalType = newValue
-                        timeManager.updateLiveActivityIfNeeded()
-                    }
-                }
+            ZStack {
+                Color(UIColor.systemBackground)
+                    .ignoresSafeArea()
                 
-                Section(header: Text("时间目标设置")) {
-                    HStack {
-                        Text("小时")
-                        Spacer()
-                        Stepper("\(Int(timeGoalHours)) 小时", value: $timeGoalHours, in: 0...24)
+                Form {
+                    Section(header: Text("目标类型")) {
+                        Picker("目标类型", selection: $selectedGoalType) {
+                            HStack {
+                                Image(systemName: "clock")
+                                Text("时间目标")
+                            }
+                            .tag(GoalType.time)
+                            
+                            HStack {
+                                Image(systemName: "dollarsign.circle")
+                                Text("收入目标")
+                            }
+                            .tag(GoalType.income)
+                        }
+                        .pickerStyle(SegmentedPickerStyle())
+                        .onChange(of: selectedGoalType) { newValue in
+                            timeManager.settings.activeGoalType = newValue
+                            timeManager.updateLiveActivityIfNeeded()
+                        }
                     }
                     
-                    HStack {
-                        Text("分钟")
-                        Spacer()
-                        Stepper("\(Int(timeGoalMinutes)) 分钟", value: $timeGoalMinutes, in: 0...59)
+                    Section(header:
+                            HStack {
+                                Image(systemName: "clock")
+                                Text("时间目标设置")
+                            }
+                    ) {
+                        HStack {
+                            Text("小时")
+                            Spacer()
+                            Stepper("\(Int(timeGoalHours)) 小时", value: $timeGoalHours, in: 0...24)
+                        }
+                        
+                        HStack {
+                            Text("分钟")
+                            Spacer()
+                            Stepper("\(Int(timeGoalMinutes)) 分钟", value: $timeGoalMinutes, in: 0...59)
+                        }
+                        
+                        // 显示当前设置的时间目标
+                        HStack {
+                            Text("当前设置")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(Int(timeGoalHours))时\(Int(timeGoalMinutes))分")
+                                .foregroundColor(colorScheme == .dark ? Color(hex: 0xFFD700) : .green)
+                        }
                     }
-                }
-                
-                Section(header: Text("收入目标设置")) {
-                    HStack {
-                        Text("目标收入")
-                        TextField("输入目标收入", text: $incomeGoal)
-                            .keyboardType(.decimalPad)
-                            .multilineTextAlignment(.trailing)
+                    
+                    Section(header:
+                            HStack {
+                                Image(systemName: "dollarsign.circle")
+                                Text("收入目标设置")
+                            }
+                    ) {
+                        HStack {
+                            Text("目标收入")
+                            Spacer()
+                            TextField("输入目标收入", text: $incomeGoal)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        
+                        // 显示当前设置的收入目标
+                        HStack {
+                            Text("当前设置")
+                                .foregroundColor(.secondary)
+                            Spacer()
+                            Text("\(timeManager.settings.currency)\(incomeGoal)")
+                                .foregroundColor(colorScheme == .dark ? Color(hex: 0xFFD700) : Color(hex: 0xB8860B))
+                        }
                     }
-                }
-                
-                Section {
-                    Button("保存目标设置") {
-                        saveSettings()
-                        presentationMode.wrappedValue.dismiss()
+                    
+                    Section {
+                        Button(action: saveSettings) {
+                            HStack {
+                                Spacer()
+                                Image(systemName: "checkmark.circle")
+                                Text("保存目标设置")
+                                Spacer()
+                            }
+                            .padding(.vertical, 10)
+                            .foregroundColor(.white)
+                            .background(Color.accentColor)
+                            .cornerRadius(8)
+                        }
                     }
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .foregroundColor(.blue)
                 }
             }
             .navigationTitle("目标设置")
             .navigationBarItems(trailing: Button("关闭") {
                 presentationMode.wrappedValue.dismiss()
             })
+            .accentColor(colorScheme == .dark ? Color(hex: 0xFFD700) : Color(hex: 0xB8860B))
         }
     }
     
@@ -99,5 +150,22 @@ struct GoalSettingsView: View {
         
         // 更新LiveActivity
         timeManager.updateLiveActivityIfNeeded()
+        
+        // 关闭视图
+        presentationMode.wrappedValue.dismiss()
+    }
+}
+
+struct GoalSettingsView_Previews: PreviewProvider {
+    static var previews: some View {
+        Group {
+            GoalSettingsView(timeManager: TimeManager())
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.light)
+            
+            GoalSettingsView(timeManager: TimeManager())
+                .environmentObject(TimeManager())
+                .preferredColorScheme(.dark)
+        }
     }
 }

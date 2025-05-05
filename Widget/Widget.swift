@@ -35,7 +35,7 @@ struct Provider: TimelineProvider {
             workedTime: "00:00:00",
             isWorking: false,
             currency: "¥",
-            decimalPlaces: 4,
+            decimalPlaces: 2,
             timeGoal: 8.0,
             incomeGoal: 1000.0,
             activeGoalType: .time
@@ -60,7 +60,7 @@ struct Provider: TimelineProvider {
             workedTime: formattedWorkTime,
             isWorking: settings.isWorking,
             currency: settings.currency,
-            decimalPlaces: 4,
+            decimalPlaces: 2,
             timeGoal: settings.timeGoal,
             incomeGoal: settings.incomeGoal,
             activeGoalType: settings.activeGoalType
@@ -97,7 +97,7 @@ struct Provider: TimelineProvider {
                 workedTime: formattedWorkTime,
                 isWorking: settings.isWorking,
                 currency: settings.currency,
-                decimalPlaces: 4,
+                decimalPlaces: 2,
                 timeGoal: settings.timeGoal,
                 incomeGoal: settings.incomeGoal,
                 activeGoalType: settings.activeGoalType
@@ -125,12 +125,12 @@ struct SimpleEntry: TimelineEntry {
     let currency: String
     let decimalPlaces: Int
     
-    // 新增目标相关属性
+    // 目标相关属性
     let timeGoal: Double
     let incomeGoal: Double
     let activeGoalType: GoalType
     
-    // 格式化工资显示为四位小数
+    // 格式化工资显示为指定小数位数
     func formattedEarnings() -> String {
         let format = "%.\(decimalPlaces)f"
         return "\(currency)\(String(format: format, earnedMoney))"
