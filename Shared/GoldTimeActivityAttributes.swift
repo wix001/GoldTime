@@ -15,56 +15,22 @@ struct GoldTimeActivityAttributes: ActivityAttributes {
         var hourlyRate: Double
         var startTime: Date
         var pausedTotalTime: TimeInterval
+        
+        // 添加预先计算的值，减少实时计算需要
+        var calculatedEarnings: Double
+        var calculatedProgress: Double
+        
         var isWorking: Bool
         var currency: String
         var decimalPlaces: Int = 4 // 默认显示4位小数
         
-        // 新增目标相关属性
+        // 添加最后更新时间，用于显示和监控
+        var lastUpdateTime: Date = Date()
+        
+        // 目标相关属性
         var timeGoal: Double = 8.0
         var incomeGoal: Double = 1000.0
         var activeGoalType: GoalType = .time
-        
-        // 计算已工作的总时间
-        func calculateWorkedTime(currentTime: Date = Date()) -> TimeInterval {
-            guard isWorking else {
-                return pausedTotalTime
-            }
-            
-            return pausedTotalTime + currentTime.timeIntervalSince(startTime)
-        }
-        
-        // 计算已赚取的金额
-        func calculateEarnedMoney(currentTime: Date = Date()) -> Double {
-            let workedHours = calculateWorkedTime(currentTime: currentTime) / 3600
-            return hourlyRate * workedHours
-        }
-        
-        // 格式化工资显示
-        func formattedEarnings(currentTime: Date = Date()) -> String {
-            let format = "%.\(decimalPlaces)f"
-            return "\(currency)\(String(format: format, calculateEarnedMoney(currentTime: currentTime)))"
-        }
-        
-        // 格式化工作时间
-        func formattedWorkTime(currentTime: Date = Date()) -> String {
-            let totalSeconds = Int(calculateWorkedTime(currentTime: currentTime))
-            let hours = totalSeconds / 3600
-            let minutes = (totalSeconds % 3600) / 60
-            let seconds = totalSeconds % 60
-            return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
-        }
-        
-        // 计算目标完成度
-        func calculateGoalProgress(currentTime: Date = Date()) -> Double {
-            switch activeGoalType {
-            case .time:
-                let workedHours = calculateWorkedTime(currentTime: currentTime) / 3600
-                return min(workedHours / timeGoal, 1.0)
-            case .income:
-                let earned = calculateEarnedMoney(currentTime: currentTime)
-                return min(earned / incomeGoal, 1.0)
-            }
-        }
         
         // 获取目标说明文本
         func getGoalDescription() -> String {
@@ -78,9 +44,10 @@ struct GoldTimeActivityAttributes: ActivityAttributes {
             }
         }
         
-        // 获取目标进度百分比文本
-        func getGoalProgressText(currentTime: Date = Date()) -> String {
-            return String(format: "%.0f%%", calculateGoalProgress(currentTime: currentTime) * 100)
+        // 格式化工资显示
+        func formattedEarnings() -> String {
+            let format = "%.\(decimalPlaces)f"
+            return "\(currency)\(String(format: format, calculatedEarnings))"
         }
     }
     

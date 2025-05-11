@@ -16,8 +16,13 @@ public class TimeManager: ObservableObject {
             UserDefaultsManager.shared.saveUserSettings(settings)
             WidgetCenter.shared.reloadAllTimelines() // 更新小组件
             
-            // 更新LiveActivity状态
-            updateLiveActivityIfNeeded()
+            // 更新LiveActivity状态 - 针对状态变化立即更新
+            if settings.isWorking != oldValue.isWorking ||
+               settings.hourlyRate != oldValue.hourlyRate ||
+               settings.currency != oldValue.currency ||
+               settings.activeGoalType != oldValue.activeGoalType {
+                updateLiveActivityIfNeeded()
+            }
         }
     }
     
@@ -27,11 +32,22 @@ public class TimeManager: ObservableObject {
     
     private var timer: Timer?
     
+    // 追踪上次LiveActivity更新时间
+    private var lastLiveActivityUpdate: Date = Date()
+    private let liveActivityUpdateInterval: TimeInterval = 60 // 60秒
+    
     init() {
         // 从UserDefaults加载设置
         self.settings = UserDefaultsManager.shared.loadUserSettings()
         self.workRecords = UserDefaultsManager.shared.loadWorkRecords()
         self.startUpdatingIfNeeded()
+        
+        // 设置电量监测
+        UIDevice.current.isBatteryMonitoringEnabled = true
+    }
+    
+    deinit {
+        UIDevice.current.isBatteryMonitoringEnabled = false
     }
     
     // 设置时薪
@@ -86,6 +102,9 @@ public class TimeManager: ObservableObject {
             
             // 启动LiveActivity
             LiveActivityManager.shared.startActivity(with: settings)
+            
+            // 记录更新时间
+            lastLiveActivityUpdate = Date()
         }
     }
     
@@ -115,8 +134,14 @@ public class TimeManager: ObservableObject {
             
             stopUpdating()
             
-            // 更新或结束LiveActivity
+            // 更新收入值，确保暂停后显示正确
+            updateCurrentStatus()
+            
+            // 更新或结束LiveActivity - 状态改变时立即更新
             LiveActivityManager.shared.updateActivity(with: settings)
+            
+            // 记录更新时间
+            lastLiveActivityUpdate = Date()
         }
     }
     
@@ -137,6 +162,7 @@ public class TimeManager: ObservableObject {
         if settings.isWorking {
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 self?.updateCurrentStatus()
+                self?.checkAndUpdateLiveActivity()
             }
             RunLoop.current.add(timer!, forMode: .common)
         }
@@ -148,19 +174,27 @@ public class TimeManager: ObservableObject {
         timer = nil
         updateCurrentStatus()
     }
+    
+    // 检查是否需要更新LiveActivity
+    private func checkAndUpdateLiveActivity() {
+        // 仅在工作状态且已经过去liveActivityUpdateInterval时间后更新
+        if settings.isWorking &&
+           Date().timeIntervalSince(lastLiveActivityUpdate) >= liveActivityUpdateInterval {
+            updateLiveActivityIfNeeded()
+            lastLiveActivityUpdate = Date()
+        }
+    }
+    
     // 更新LiveActivity（如果需要）
     func updateLiveActivityIfNeeded() {
         // 尝试调用常规的更新方法
-        do {
-            LiveActivityManager.shared.updateActivity(with: settings)
-        } catch {
-            // 如果调用失败，使用替代方法
-            print("无法直接更新LiveActivity，尝试替代方法")
-            // 保存最新设置，这将触发数据更新
-            UserDefaultsManager.shared.saveUserSettings(settings)
-            // 刷新小组件时间线
-            WidgetCenter.shared.reloadAllTimelines()
-        }
+        LiveActivityManager.shared.updateActivity(with: settings)
+        
+        // 保存最新设置，这将触发数据更新
+        UserDefaultsManager.shared.saveUserSettings(settings)
+        
+        // 刷新小组件时间线
+        WidgetCenter.shared.reloadAllTimelines()
     }
     
     // 更新当前状态（工作时间和收入）
@@ -176,9 +210,12 @@ public class TimeManager: ObservableObject {
         // 计算收入
         currentEarnings = settings.calculateEarnedMoney()
         
-        // 更新小组件
-        WidgetCenter.shared.reloadAllTimelines()
+        // 更新小组件 - 但不需要每秒都更新
+        if totalSeconds % 5 == 0 { // 每5秒更新一次
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
+    
     // 添加此方法以监听通知更新
     func setupNotificationObserver() {
         // 监听由ScreenStateMonitor发送的更新通知
@@ -188,7 +225,42 @@ public class TimeManager: ObservableObject {
             name: Notification.Name("com.wix.GoldTime.updateLiveActivity"),
             object: nil
         )
+        
+        // 监听电池状态变化
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(batteryStateDidChange),
+            name: UIDevice.batteryStateDidChangeNotification,
+            object: nil
+        )
     }
+    
+    // 处理电池状态变化
+    @objc private func batteryStateDidChange(_ notification: Notification) {
+        // 根据电池状态调整更新频率
+        if UIDevice.current.batteryState == .unplugged &&
+           UIDevice.current.batteryLevel < 0.2 {
+            // 低电量模式，减少更新频率
+            if let timer = timer {
+                timer.invalidate()
+                self.timer = Timer.scheduledTimer(
+                    withTimeInterval: 5.0, // 降低到5秒一次
+                    repeats: true
+                ) { [weak self] _ in
+                    self?.updateCurrentStatus()
+                    self?.checkAndUpdateLiveActivity()
+                }
+                RunLoop.current.add(self.timer!, forMode: .common)
+            }
+        } else {
+            // 正常电量模式，恢复正常频率
+            if settings.isWorking {
+                stopUpdating()
+                startUpdatingIfNeeded()
+            }
+        }
+    }
+    
     // 处理更新请求
     @objc private func handleLiveActivityUpdateRequest(_ notification: Notification) {
         updateLiveActivityIfNeeded()
