@@ -16,10 +16,6 @@ public class ScreenStateMonitor {
     private var isObserving = false
     private var userDefaultsManager = UserDefaultsManager.shared
     
-    // 上次检测时间和最小检测间隔
-    private var lastScreenWakeTime: Date = Date()
-    private let minimumWakeInterval: TimeInterval = 15 // 15秒
-    
     private init() {}
     
     /// 开始监听屏幕状态变化
@@ -51,31 +47,16 @@ public class ScreenStateMonitor {
         isObserving = false
     }
     
-    /// 屏幕唤醒时调用 - 添加节流控制
+    /// 屏幕唤醒时调用
     @objc private func screenDidWake(_ notification: Notification) {
-        // 检查是否满足最小间隔要求
-        let now = Date()
-        if now.timeIntervalSince(lastScreenWakeTime) < minimumWakeInterval {
-            print("不满足最小间隔，跳过更新")
-            return // 不满足最小间隔，跳过更新
-        }
-        
-        // 更新最后检测时间
-        lastScreenWakeTime = now
-        
         print("用户唤醒屏幕")
         // 获取当前用户设置
         let settings = userDefaultsManager.loadUserSettings()
         
         // 如果正在工作，则更新活动
         if settings.isWorking {
-            // 更新最后更新时间
-            var updatedSettings = settings
-            updatedSettings.updateLastUpdateTime()
-            userDefaultsManager.saveUserSettings(updatedSettings)
-            
-            // 使用备用方法更新活动
-            updateLiveActivity(with: updatedSettings)
+            // 使用备用方法更新活动，避免可能无法编译的问题
+            updateLiveActivity(with: settings)
             
             // 刷新小组件时间线
             WidgetCenter.shared.reloadAllTimelines()
