@@ -20,9 +20,6 @@ public struct UserSettings: Codable {
     var incomeGoal: Double = 1000.0 // 默认目标收入1000元
     var activeGoalType: GoalType = .time // 默认使用时间目标
     
-    // 记录上次更新时间，用于监控更新频率
-    var lastUpdateTime: Date = Date()
-    
     // 计算已工作的总时间
     func calculateWorkedTime(currentTime: Date = Date()) -> TimeInterval {
         guard let start = startTime, isWorking else {
@@ -60,11 +57,6 @@ public struct UserSettings: Codable {
         case .income:
             return String(format: "目标: %@%.2f", currency, incomeGoal)
         }
-    }
-    
-    // 更新最后更新时间
-    mutating func updateLastUpdateTime() {
-        lastUpdateTime = Date()
     }
 }
 
