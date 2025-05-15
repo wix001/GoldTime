@@ -21,6 +21,14 @@ struct GoldTimeApp: App {
                 .onAppear {
                     // 启动屏幕状态监视器
                     ScreenStateMonitor.shared.startMonitoring()
+                    
+                    // 设置通知监听器
+                    timeManager.setupNotificationObserver()
+                    
+                    // 如果正在工作，确保LiveActivity正常运行
+                    if timeManager.settings.isWorking {
+                        timeManager.updateLiveActivityIfNeeded()
+                    }
                 }
                 .onDisappear {
                     // 停止监视器
@@ -38,12 +46,8 @@ struct GoldTimeApp: App {
                 }
                 .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
                     // 当应用返回前台时，根据情况更新或关闭LiveActivity
-                    if timeManager.settings.isWorking {
-                        timeManager.updateLiveActivityIfNeeded()
-                    } else if !timeManager.settings.isWorking && LiveActivityManager.shared.hasActiveActivity {
-                        timeManager.settings.isWorking = false
-                        timeManager.updateLiveActivityIfNeeded()
-                    }
+                    // 关键是确保LiveActivity状态与App状态同步
+                    timeManager.updateLiveActivityIfNeeded()
                     
                     // 结束后台任务
                     BackgroundManager.shared.endBackgroundTask()

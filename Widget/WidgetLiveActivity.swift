@@ -31,7 +31,7 @@ struct WidgetLiveActivity: Widget {
                 }
                 
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(context.state.formattedWorkTime())
+                    LiveTimeView(context: context)
                         .font(.caption)
                         .bold()
                 }
@@ -41,8 +41,8 @@ struct WidgetLiveActivity: Widget {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    // 收入金额
-                    Text(context.state.formattedEarnings())
+                    // 收入金额 - 使用实时更新的视图
+                    LiveEarningsView(context: context)
                         .font(.system(size: 24, weight: .bold))
                         .foregroundColor(context.state.isWorking ? Color(hex: 0xFFD700) : Color.secondary)
                 }
@@ -77,8 +77,8 @@ struct WidgetLiveActivity: Widget {
                         .font(.caption2)
                 }
             } compactTrailing: {
-                // 动态岛右侧紧凑视图
-                Text(context.state.formattedEarnings())
+                // 动态岛右侧紧凑视图 - 使用实时更新的视图
+                LiveEarningsView(context: context)
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(context.state.isWorking ? Color(hex: 0xFFD700) : Color.secondary)
             } minimal: {
@@ -90,6 +90,74 @@ struct WidgetLiveActivity: Widget {
             .keylineTint(context.state.isWorking ? .green : Color(hex: 0xFFD700))
         }
         .contentMarginsDisabled()
+    }
+}
+
+// 实时更新的工作时间视图组件
+struct LiveTimeView: View {
+    let context: ActivityViewContext<GoldTimeActivityAttributes>
+    @State private var currentTime = Date()
+    
+    // 使用计时器来更新当前时间
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        Text(getCurrentWorkTimeFormatted())
+            .onReceive(timer) { _ in
+                currentTime = Date()
+            }
+    }
+    
+    // 获取当前工作时间（格式化后的）
+    private func getCurrentWorkTimeFormatted() -> String {
+        let totalSeconds = Int(calculateRealTimeWorkedTime())
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let seconds = totalSeconds % 60
+        return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
+    }
+    
+    // 实时计算工作时间
+    private func calculateRealTimeWorkedTime() -> TimeInterval {
+        guard context.state.isWorking else {
+            return context.state.pausedTotalTime
+        }
+        
+        return context.state.pausedTotalTime + currentTime.timeIntervalSince(context.state.startTime)
+    }
+}
+
+// 实时更新的收入视图组件
+struct LiveEarningsView: View {
+    let context: ActivityViewContext<GoldTimeActivityAttributes>
+    @State private var currentTime = Date()
+    
+    // 使用计时器来更新当前时间
+    let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    
+    var body: some View {
+        Text(getCurrentEarningsFormatted())
+            .onReceive(timer) { _ in
+                currentTime = Date()
+            }
+    }
+    
+    // 获取当前收入（格式化后的）
+    private func getCurrentEarningsFormatted() -> String {
+        let workedHours = calculateRealTimeWorkedTime() / 3600
+        let earnings = context.state.hourlyRate * workedHours
+        
+        let format = "%.\(context.state.decimalPlaces)f"
+        return "\(context.state.currency)\(String(format: format, earnings))"
+    }
+    
+    // 实时计算工作时间
+    private func calculateRealTimeWorkedTime() -> TimeInterval {
+        guard context.state.isWorking else {
+            return context.state.pausedTotalTime
+        }
+        
+        return context.state.pausedTotalTime + currentTime.timeIntervalSince(context.state.startTime)
     }
 }
 
@@ -113,7 +181,7 @@ struct LockScreenLiveActivityView: View {
                             .foregroundColor(.secondary)
                     }
                     
-                    // 收入金额
+                    // 收入金额 - 直接在UI中更新
                     Text(getRealTimeEarnings())
                         .font(.system(size: 28, weight: .bold))
                         .foregroundColor(context.state.isWorking ?
@@ -138,7 +206,7 @@ struct LockScreenLiveActivityView: View {
             }
             
             // 进度条 - 根据目标类型显示进度
-            ProgressView(value: context.state.calculateGoalProgress())
+            ProgressView(value: calculateRealTimeProgress())
                 .progressViewStyle(LinearProgressViewStyle(tint: context.state.activeGoalType == .time ? .green : Color(hex: 0xFFD700)))
                 .padding(.vertical, 4)
 
@@ -156,8 +224,8 @@ struct LockScreenLiveActivityView: View {
                 
                 Spacer()
                 
-                // 目标信息
-                Text("\(context.state.getGoalDescription()) (\(context.state.getGoalProgressText()))")
+                // 目标信息 - 实时更新进度
+                Text("\(context.state.getGoalDescription()) (\(getRealTimeProgressText()))")
                     .font(.caption)
                     .foregroundColor(.secondary)
             }
@@ -193,6 +261,24 @@ struct LockScreenLiveActivityView: View {
         
         let format = "%.\(context.state.decimalPlaces)f"
         return "\(context.state.currency)\(String(format: format, earnings))"
+    }
+    
+    // 实时计算目标进度
+    private func calculateRealTimeProgress() -> Double {
+        switch context.state.activeGoalType {
+        case .time:
+            let workedHours = calculateRealTimeWorkedTime() / 3600
+            return min(workedHours / context.state.timeGoal, 1.0)
+        case .income:
+            let workedHours = calculateRealTimeWorkedTime() / 3600
+            let earnings = context.state.hourlyRate * workedHours
+            return min(earnings / context.state.incomeGoal, 1.0)
+        }
+    }
+    
+    // 实时获取进度文本
+    private func getRealTimeProgressText() -> String {
+        return String(format: "%.0f%%", calculateRealTimeProgress() * 100)
     }
 }
 

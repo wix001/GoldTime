@@ -105,11 +105,6 @@ class LiveActivityManager {
             }
             
             print("LiveActivity创建成功: \(self.activity?.id ?? "未知")")
-            
-            // 如果当前是工作状态，启动定时器
-            if settings.isWorking {
-                startUpdateTimer()
-            }
         } catch {
             print("创建LiveActivity出错: \(error.localizedDescription)")
         }
@@ -197,15 +192,6 @@ class LiveActivityManager {
                 await activity.update(using: updatedState)
             }
         }
-        
-        // 根据工作状态管理定时器
-        if settings.isWorking && updateTimer == nil {
-            // 如果正在工作且定时器未启动，启动定时器
-            startUpdateTimer()
-        } else if !settings.isWorking {
-            // 如果暂停工作，停止更新定时器，但保持LiveActivity存在
-            stopUpdateTimer()
-        }
     }
     
     // 结束LiveActivity
@@ -213,15 +199,20 @@ class LiveActivityManager {
         endAllActivities()
     }
     
-    // 启动更新定时器
+    // 修改这部分代码
     private func startUpdateTimer() {
         // 停止当前的定时器（如果有）
         stopUpdateTimer()
         
-        // 创建新的每秒更新定时器，确保在主线程中
+        // 创建新的定时器，每10秒更新一次，用于保持活动状态
         DispatchQueue.main.async {
-            self.updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-                self?.updateCurrentActivity()
+            self.updateTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: true) { [weak self] _ in
+                // 直接获取设置，不使用 if let
+                let userSettings = UserDefaultsManager.shared.loadUserSettings()
+                if userSettings.isWorking {
+                    // 只在必要时触发更新
+                    self?.updateActivity(with: userSettings)
+                }
             }
             
             // 确保定时器在后台也能运行
@@ -233,38 +224,5 @@ class LiveActivityManager {
     private func stopUpdateTimer() {
         updateTimer?.invalidate()
         updateTimer = nil
-    }
-    
-    // 更新当前活动的LiveActivity（不改变基本参数，仅触发UI刷新）
-    private func updateCurrentActivity() {
-        guard let activity = activity, activity.activityState != .ended else { return }
-        
-        // 获取当前状态
-        let currentState = activity.content.state
-        
-        // 创建一个新的状态对象，内容与当前状态相同
-        // 这将触发UI更新，显示最新的计算结果
-        let updatedState = GoldTimeActivityAttributes.ContentState(
-            hourlyRate: currentState.hourlyRate,
-            startTime: currentState.startTime,
-            pausedTotalTime: currentState.pausedTotalTime,
-            isWorking: currentState.isWorking,
-            currency: currentState.currency,
-            decimalPlaces: currentState.decimalPlaces,
-            timeGoal: currentState.timeGoal,
-            incomeGoal: currentState.incomeGoal,
-            activeGoalType: currentState.activeGoalType
-        )
-        
-        // 兼容不同iOS版本的更新方式
-        Task {
-            if #available(iOS 16.2, *) {
-                // iOS 16.2及更高版本
-                await activity.update(.init(state: updatedState, staleDate: .distantFuture))
-            } else {
-                // iOS 16.1
-                await activity.update(using: updatedState)
-            }
-        }
     }
 }

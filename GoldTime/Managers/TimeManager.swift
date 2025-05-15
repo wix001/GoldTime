@@ -16,8 +16,15 @@ public class TimeManager: ObservableObject {
             UserDefaultsManager.shared.saveUserSettings(settings)
             WidgetCenter.shared.reloadAllTimelines() // 更新小组件
             
-            // 更新LiveActivity状态
-            updateLiveActivityIfNeeded()
+            // 只在关键属性变更时更新LiveActivity
+            if oldValue.isWorking != settings.isWorking ||
+               oldValue.hourlyRate != settings.hourlyRate ||
+               oldValue.currency != settings.currency ||
+               oldValue.activeGoalType != settings.activeGoalType ||
+               oldValue.timeGoal != settings.timeGoal ||
+               oldValue.incomeGoal != settings.incomeGoal {
+                updateLiveActivityIfNeeded()
+            }
         }
     }
     
@@ -148,19 +155,14 @@ public class TimeManager: ObservableObject {
         timer = nil
         updateCurrentStatus()
     }
+    
     // 更新LiveActivity（如果需要）
     func updateLiveActivityIfNeeded() {
-        // 尝试调用常规的更新方法
-        do {
-            LiveActivityManager.shared.updateActivity(with: settings)
-        } catch {
-            // 如果调用失败，使用替代方法
-            print("无法直接更新LiveActivity，尝试替代方法")
-            // 保存最新设置，这将触发数据更新
-            UserDefaultsManager.shared.saveUserSettings(settings)
-            // 刷新小组件时间线
-            WidgetCenter.shared.reloadAllTimelines()
-        }
+        // 确保在主动关键设置变更时更新LiveActivity
+        LiveActivityManager.shared.updateActivity(with: settings)
+        
+        // 刷新小组件时间线
+        WidgetCenter.shared.reloadAllTimelines()
     }
     
     // 更新当前状态（工作时间和收入）
@@ -179,6 +181,7 @@ public class TimeManager: ObservableObject {
         // 更新小组件
         WidgetCenter.shared.reloadAllTimelines()
     }
+    
     // 添加此方法以监听通知更新
     func setupNotificationObserver() {
         // 监听由ScreenStateMonitor发送的更新通知
@@ -189,6 +192,7 @@ public class TimeManager: ObservableObject {
             object: nil
         )
     }
+    
     // 处理更新请求
     @objc private func handleLiveActivityUpdateRequest(_ notification: Notification) {
         updateLiveActivityIfNeeded()
