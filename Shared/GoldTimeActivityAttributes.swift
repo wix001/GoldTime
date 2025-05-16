@@ -1,5 +1,5 @@
 //
-//  GoldTimeActivityAttributes.swift
+//  GoldTimeActivityAttributes.swift (Minimal Version)
 //  GoldTime
 //
 //  Created on 03/05/2025.
@@ -8,82 +8,41 @@
 import Foundation
 import ActivityKit
 
-// 定义LiveActivity的属性和内容状态
+// 定义LiveActivity的属性和内容状态 (最小化版本)
 struct GoldTimeActivityAttributes: ActivityAttributes {
-    // 固定属性 - 活动一旦创建就不会改变的属性
     public struct ContentState: Codable, Hashable {
-        var hourlyRate: Double
-        var startTime: Date
-        var pausedTotalTime: TimeInterval
-        var isWorking: Bool
-        var currency: String
-        var decimalPlaces: Int = 4 // 默认显示4位小数
-        
-        // 新增目标相关属性
-        var timeGoal: Double = 8.0
-        var incomeGoal: Double = 1000.0
-        var activeGoalType: GoalType = .time
-        
-        // 计算已工作的总时间
-        func calculateWorkedTime(currentTime: Date = Date()) -> TimeInterval {
+        // 最小化状态，只需要一个可以区分不同 Activity 实例的值（如果需要）
+        // 或者只是一个简单的占位符，因为这个最小化视图不直接使用它。
+        var lastUpdateTime: Date // 记录主App最后一次更新状态的时间 (可选，但有时有用)
+        var isWorking: Bool      // 仍然需要知道是否应该计时
+        var startTime: Date      // 计时开始时间
+        var pausedTotalTime: TimeInterval // 累计暂停时间
+
+        // 我们可以保留一个简单的格式化时间函数，如果需要在锁屏上显示它
+        func formattedElapsedTime(currentTime: Date) -> String {
             guard isWorking else {
-                return pausedTotalTime
+                // 如果暂停了，可以显示总的暂停时间，或者一个固定的"Paused"文本
+                let totalPausedSeconds = Int(round(pausedTotalTime))
+                let p_hours = totalPausedSeconds / 3600
+                let p_minutes = (totalPausedSeconds % 3600) / 60
+                let p_seconds = totalPausedSeconds % 60
+                return String(format: "Paused: %02d:%02d:%02d", p_hours, p_minutes, p_seconds)
             }
             
-            return pausedTotalTime + currentTime.timeIntervalSince(startTime)
-        }
-        
-        // 计算已赚取的金额
-        func calculateEarnedMoney(currentTime: Date = Date()) -> Double {
-            let workedHours = calculateWorkedTime(currentTime: currentTime) / 3600
-            return hourlyRate * workedHours
-        }
-        
-        // 格式化工资显示
-        func formattedEarnings(currentTime: Date = Date()) -> String {
-            let format = "%.\(decimalPlaces)f"
-            return "\(currency)\(String(format: format, calculateEarnedMoney(currentTime: currentTime)))"
-        }
-        
-        // 格式化工作时间
-        func formattedWorkTime(currentTime: Date = Date()) -> String {
-            let totalSeconds = Int(calculateWorkedTime(currentTime: currentTime))
+            let currentElapsed = pausedTotalTime + currentTime.timeIntervalSince(startTime)
+            let totalSeconds = Int(round(currentElapsed))
             let hours = totalSeconds / 3600
             let minutes = (totalSeconds % 3600) / 60
             let seconds = totalSeconds % 60
             return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         }
-        
-        // 计算目标完成度
-        func calculateGoalProgress(currentTime: Date = Date()) -> Double {
-            switch activeGoalType {
-            case .time:
-                let workedHours = calculateWorkedTime(currentTime: currentTime) / 3600
-                return min(workedHours / timeGoal, 1.0)
-            case .income:
-                let earned = calculateEarnedMoney(currentTime: currentTime)
-                return min(earned / incomeGoal, 1.0)
-            }
-        }
-        
-        // 获取目标说明文本
-        func getGoalDescription() -> String {
-            switch activeGoalType {
-            case .time:
-                let hours = Int(timeGoal)
-                let minutes = Int((timeGoal - Double(hours)) * 60)
-                return String(format: "目标: %d时%02d分", hours, minutes)
-            case .income:
-                return String(format: "目标: %@%.2f", currency, incomeGoal)
-            }
-        }
-        
-        // 获取目标进度百分比文本
-        func getGoalProgressText(currentTime: Date = Date()) -> String {
-            return String(format: "%.0f%%", calculateGoalProgress(currentTime: currentTime) * 100)
-        }
     }
     
-    // 显示名称 - 活动的标题
-    var name: String
+    // 固定属性
+    var activityName: String = "Minimal Timer" // 一个简单的名称
+
+    // 关键：告诉系统这是一个计时器
+    static var showsLiveActivityTimer: Bool {
+        return true
+    }
 }

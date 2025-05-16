@@ -1,5 +1,5 @@
 //
-//  LiveActivityManager.swift
+//  LiveActivityManager.swift (Adjusted for Minimal Live Activity & TimelineView)
 //  GoldTime
 //
 //  Created on 03/05/2025.
@@ -7,264 +7,233 @@
 
 import Foundation
 import ActivityKit
-import SwiftUI
+import SwiftUI // 仍然需要，因为 UserSettings 可能来自 SwiftUI 环境
 import WidgetKit
+
 
 // LiveActivity管理器，负责创建、更新和结束LiveActivity
 class LiveActivityManager {
-    // 使用静态属性而不是shared单例模式
-    private static var _shared: LiveActivityManager?
-    static var shared: LiveActivityManager {
-        if _shared == nil {
-            _shared = LiveActivityManager()
-        }
-        return _shared!
-    }
+    // 更简洁的单例模式
+    static let shared = LiveActivityManager()
     
     private var activity: Activity<GoldTimeActivityAttributes>?
-    private var updateTimer: Timer?
+    // 移除了 updateTimer，因为更新由 TimelineView 在 Widget 内部处理
     
-    private init() {}
+    private init() {} // 保持私有构造函数
     
     // 检查是否支持LiveActivity
     var isSupported: Bool {
-        return ActivityAuthorizationInfo().areActivitiesEnabled
+        // 可以在这里添加更详细的 iOS 版本检查，如果需要的话
+        if #available(iOS 16.1, *) {
+            return ActivityAuthorizationInfo().areActivitiesEnabled
+        }
+        return false
     }
     
     // 检查是否已有活动的LiveActivity
     var hasActiveActivity: Bool {
-        return activity != nil && activity?.activityState != .ended
+        guard let currentActivity = activity else { return false }
+        return currentActivity.activityState == .active || currentActivity.activityState == .stale
     }
     
     // 开始一个新的LiveActivity
     func startActivity(with settings: UserSettings, forceStart: Bool = false) {
-        // 确保系统支持LiveActivity
-        guard isSupported else { return }
+        guard isSupported else {
+            print("Live Activities not supported or not enabled.")
+            return
+        }
         
-        // 如果已经有一个活动的LiveActivity，则根据forceStart决定是否更新或重新创建
-        if hasActiveActivity {
+        // 如果已经有一个活动的LiveActivity
+        if let currentActivity = activity, currentActivity.activityState == .active || currentActivity.activityState == .stale {
             if forceStart {
+                print("Forcing start: Ending existing activity first.")
                 // 如果强制启动，先结束现有的活动
-                endAllActivities()
-                // 等待一小段时间确保LiveActivity被完全清除
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                    self.createNewActivity(with: settings)
+                Task { // 将结束操作放入 Task 中
+                    await endActivityInternal(activityToEnd: currentActivity, andClearShared: true)
+                    // 等待一小段时间确保LiveActivity被完全清除 (这个延迟可能需要也可能不需要，取决于系统行为)
+                    // 通常情况下，直接创建新的应该没问题，因为 Activity.request 是异步的。
+                    // 但为了安全，保留一个非常短的延迟。
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                        self.createNewActivity(with: settings)
+                    }
                 }
                 return
             } else {
-                // 否则只更新现有活动
-                updateActivity(with: settings)
+                // 否则只更新现有活动的状态
+                print("Updating existing activity.")
+                updateActivityContent(with: settings) // 确保这个方法只更新必要的状态
                 return
             }
         }
         
-        // 没有活动的LiveActivity，直接创建
+        // 没有活动的LiveActivity，或者之前的已结束，直接创建新的
+        print("Creating new activity.")
         createNewActivity(with: settings)
     }
     
     // 创建新的LiveActivity
     private func createNewActivity(with settings: UserSettings) {
-        // 获取起始时间，如果没有则使用当前时间
-        let startTime = settings.startTime ?? Date()
-        
-        // 如果没有在工作状态，则不启动LiveActivity
-        if !settings.isWorking {
+        // 如果没有在工作状态，则不启动LiveActivity (或者根据你的逻辑，可能启动一个“已暂停”状态的)
+        // 对于最小化测试，我们假设只有 isWorking 为 true 时才启动计时器
+        guard settings.isWorking else {
+            print("Not creating activity: settings.isWorking is false.")
+            // 如果需要，可以在这里结束任何可能残留的活动
+            endAllActivities() // 确保之前的都清除了
             return
         }
         
-        let attributes = GoldTimeActivityAttributes(name: "工资计算器")
+        // 使用最小化 Attributes 的 activityName
+        let attributes = GoldTimeActivityAttributes(activityName: "GoldTime Timer")
+        
+        // 使用最小化 ContentState
+        // startTime 必须在 isWorking 为 true 时有意义
+        let effectiveStartTime = settings.startTime ?? Date() // 如果 settings.startTime 为 nil，则从现在开始
+
         let state = GoldTimeActivityAttributes.ContentState(
-            hourlyRate: settings.hourlyRate,
-            startTime: startTime,
-            pausedTotalTime: settings.pausedTotalTime,
+            lastUpdateTime: Date(), // 记录本次状态生成时间
             isWorking: settings.isWorking,
-            currency: settings.currency,
-            decimalPlaces: 4,
-            timeGoal: settings.timeGoal,
-            incomeGoal: settings.incomeGoal,
-            activeGoalType: settings.activeGoalType
+            startTime: effectiveStartTime,
+            pausedTotalTime: settings.pausedTotalTime
         )
         
         // 创建LiveActivity
         do {
-            // 兼容不同iOS版本的Activity请求
+            let newActivity: Activity<GoldTimeActivityAttributes>
             if #available(iOS 16.2, *) {
-                // iOS 16.2及更高版本
-                activity = try Activity.request(
+                newActivity = try Activity.request(
                     attributes: attributes,
-                    content: .init(state: state, staleDate: .distantFuture),
+                    content: .init(state: state, staleDate: nil), // staleDate: nil 或 .distantFuture
                     pushType: nil
                 )
             } else {
                 // iOS 16.1
-                activity = try Activity.request(
+                newActivity = try Activity.request(
                     attributes: attributes,
                     contentState: state,
                     pushType: nil
                 )
             }
+            self.activity = newActivity // 存储新创建的 activity
+            print("LiveActivity created successfully: \(newActivity.id)")
             
-            print("LiveActivity创建成功: \(self.activity?.id ?? "未知")")
-            
-            // 如果当前是工作状态，启动定时器
-            if settings.isWorking {
-                startUpdateTimer()
-            }
         } catch {
-            print("创建LiveActivity出错: \(error.localizedDescription)")
+            print("Error creating LiveActivity: \(error.localizedDescription)")
+            self.activity = nil // 创建失败则清空
         }
     }
     
-    // 结束所有活动的LiveActivity
-    func endAllActivities() {
-        // 首先结束当前跟踪的活动
-        if let activity = activity, activity.activityState != .ended {
-            Task {
-                await activity.end(nil, dismissalPolicy: .immediate)
-                self.activity = nil
-            }
+    // 内部使用的结束单个 Activity 的方法
+    private func endActivityInternal(activityToEnd: Activity<GoldTimeActivityAttributes>, andClearShared: Bool) async {
+        guard activityToEnd.activityState == .active || activityToEnd.activityState == .stale else { return }
+        
+        await activityToEnd.end(nil, dismissalPolicy: .immediate)
+        print("Ended activity: \(activityToEnd.id)")
+        if andClearShared && self.activity?.id == activityToEnd.id {
+            self.activity = nil
+        }
+    }
+
+    // 结束当前管理的LiveActivity
+    func endActivity() {
+        guard let currentActivity = self.activity else {
+            // 如果 self.activity 为空，也尝试清理一下所有活动的
+            endAllActivities()
+            return
         }
         
-        // 然后检查并结束所有其他可能存在的活动
         Task {
-            for activity in Activity<GoldTimeActivityAttributes>.activities {
-                if activity.activityState != .ended {
-                    await activity.end(nil, dismissalPolicy: .immediate)
-                }
-            }
+            await endActivityInternal(activityToEnd: currentActivity, andClearShared: true)
         }
-        
-        // 停止更新定时器
-        stopUpdateTimer()
     }
     
-    // 更新LiveActivity
+    // 结束所有此 App 的 LiveActivity
+    func endAllActivities() {
+        Task {
+            // 首先尝试结束当前跟踪的 activity
+            if let currentActivity = self.activity {
+                await endActivityInternal(activityToEnd: currentActivity, andClearShared: true)
+            }
+            
+            // 然后遍历并结束所有该类型的活动
+            // (确保 GoldTimeActivityAttributes 定义在 Widget Target 和 App Target 都能访问到)
+            for activityInstance in Activity<GoldTimeActivityAttributes>.activities {
+                await endActivityInternal(activityToEnd: activityInstance, andClearShared: false) // 不在这里清除 self.activity，因为可能不是当前跟踪的
+            }
+            print("Ended all activities of type GoldTimeActivityAttributes.")
+        }
+    }
+    
+    // 更新LiveActivity (当核心状态改变时，如暂停/继续，时薪改变等)
     func updateActivity(with settings: UserSettings) {
         guard isSupported else { return }
         
-        if activity == nil || activity?.activityState == .ended {
-            // 如果没有活动的LiveActivity且正在工作，创建新的
+        // 如果 activity 为 nil 或已结束，但 settings.isWorking 为 true，则尝试重新启动
+        if (activity == nil || (activity?.activityState != .active && activity?.activityState != .stale)) {
             if settings.isWorking {
-                startActivity(with: settings)
+                print("No active activity, and settings indicate working. Starting new one.")
+                startActivity(with: settings, forceStart: true) // 可能需要强制启动以覆盖旧状态
+            } else {
+                print("No active activity, and settings indicate not working. Doing nothing.")
+                // 如果不是工作状态，且没有活动，通常不需要做什么，除非你想显示一个“已结束”的Live Activity
             }
             return
         }
         
+        print("Updating activity content.")
         updateActivityContent(with: settings)
     }
     
-    // 从后台更新LiveActivity
+    // 从后台更新LiveActivity (这个方法名可能有点误导，它实际只是更新状态)
+    // 确保你的 UserSettings 能正确反映后台可能发生的变化
     func updateActivityFromBackground(with settings: UserSettings) {
-        // 确保我们在后台线程上
-        DispatchQueue.global(qos: .background).async {
-            // 更新Activity内容
+        // 确保我们在主队列上与 ActivityKit 交互 (通常是安全的，但最好明确)
+        // ActivityKit 的 API 通常是主线程安全的
+        DispatchQueue.main.async {
             self.updateActivityContent(with: settings)
             
-            // 强制更新小组件
-            DispatchQueue.main.async {
-                WidgetCenter.shared.reloadAllTimelines()
-            }
+            // 通常不需要手动 reloadAllTimelines() 来更新 Live Activity，
+            // 因为 Activity.update() 会自动触发 Widget 的刷新。
+            // WidgetCenter.shared.reloadAllTimelines() // 除非你有独立的 Widget 也需要同步
         }
     }
     
-    // 更新LiveActivity内容
+    // 更新LiveActivity内容 (仅当状态真正改变时调用)
     private func updateActivityContent(with settings: UserSettings) {
-        guard let activity = activity, activity.activityState != .ended else { return }
+        guard let currentActivity = activity, (currentActivity.activityState == .active || currentActivity.activityState == .stale) else {
+            print("Cannot update: No active or stale activity.")
+            return
+        }
         
-        // 获取合适的起始时间
-        let startTime = settings.startTime ?? Date()
-        
-        // 更新LiveActivity状态 - 无论是工作中还是已暂停
+        // startTime 对于正在运行的计时器，不应该轻易改变，除非是“继续”操作
+        // 如果是暂停->继续，startTime 应该更新为继续的时间点，pausedTotalTime 也应包含之前的累计工作时长
+        let effectiveStartTime: Date
+        if settings.isWorking {
+            // 如果是从暂停变为工作，startTime 应该是当前时间，pausedTotalTime 保持不变
+            // 如果本来就在工作，startTime 应该保持原始的开始时间
+            if currentActivity.content.state.isWorking { // 正在工作，保持原来的startTime
+                effectiveStartTime = currentActivity.content.state.startTime
+            } else { // 从暂停到工作，startTime是现在
+                effectiveStartTime = Date()
+            }
+        } else { // 如果是暂停，startTime 也是当前时间，pausedTotalTime 会包含到此刻的工作时长
+            effectiveStartTime = Date() // 或者保持 settings.startTime (如果它代表了暂停的时刻)
+        }
+
+
+        // 更新LiveActivity状态
         let updatedState = GoldTimeActivityAttributes.ContentState(
-            hourlyRate: settings.hourlyRate,
-            startTime: startTime,
-            pausedTotalTime: settings.pausedTotalTime,
+            lastUpdateTime: Date(),
             isWorking: settings.isWorking,
-            currency: settings.currency,
-            decimalPlaces: 4,
-            timeGoal: settings.timeGoal,
-            incomeGoal: settings.incomeGoal,
-            activeGoalType: settings.activeGoalType
+            startTime: effectiveStartTime, // 使用计算出的 effectiveStartTime
+            pausedTotalTime: settings.pausedTotalTime // UserSettings 应该正确管理这个值
         )
         
-        // 兼容不同iOS版本的更新方式
         Task {
-            if #available(iOS 16.2, *) {
-                // iOS 16.2及更高版本
-                await activity.update(.init(state: updatedState, staleDate: .distantFuture))
-            } else {
-                // iOS 16.1
-                await activity.update(using: updatedState)
-            }
-        }
-        
-        // 根据工作状态管理定时器
-        if settings.isWorking && updateTimer == nil {
-            // 如果正在工作且定时器未启动，启动定时器
-            startUpdateTimer()
-        } else if !settings.isWorking {
-            // 如果暂停工作，停止更新定时器，但保持LiveActivity存在
-            stopUpdateTimer()
+            let content = ActivityContent(state: updatedState, staleDate: nil)
+            await currentActivity.update(content)
+            print("Activity updated with new state. isWorking: \(updatedState.isWorking)")
         }
     }
     
-    // 结束LiveActivity
-    func endActivity() {
-        endAllActivities()
-    }
-    
-    // 启动更新定时器
-    private func startUpdateTimer() {
-        // 停止当前的定时器（如果有）
-        stopUpdateTimer()
-        
-        // 创建新的每秒更新定时器，确保在主线程中
-        DispatchQueue.main.async {
-            self.updateTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
-                self?.updateCurrentActivity()
-            }
-            
-            // 确保定时器在后台也能运行
-            RunLoop.current.add(self.updateTimer!, forMode: .common)
-        }
-    }
-    
-    // 停止更新定时器
-    private func stopUpdateTimer() {
-        updateTimer?.invalidate()
-        updateTimer = nil
-    }
-    
-    // 更新当前活动的LiveActivity（不改变基本参数，仅触发UI刷新）
-    private func updateCurrentActivity() {
-        guard let activity = activity, activity.activityState != .ended else { return }
-        
-        // 获取当前状态
-        let currentState = activity.content.state
-        
-        // 创建一个新的状态对象，内容与当前状态相同
-        // 这将触发UI更新，显示最新的计算结果
-        let updatedState = GoldTimeActivityAttributes.ContentState(
-            hourlyRate: currentState.hourlyRate,
-            startTime: currentState.startTime,
-            pausedTotalTime: currentState.pausedTotalTime,
-            isWorking: currentState.isWorking,
-            currency: currentState.currency,
-            decimalPlaces: currentState.decimalPlaces,
-            timeGoal: currentState.timeGoal,
-            incomeGoal: currentState.incomeGoal,
-            activeGoalType: currentState.activeGoalType
-        )
-        
-        // 兼容不同iOS版本的更新方式
-        Task {
-            if #available(iOS 16.2, *) {
-                // iOS 16.2及更高版本
-                await activity.update(.init(state: updatedState, staleDate: .distantFuture))
-            } else {
-                // iOS 16.1
-                await activity.update(using: updatedState)
-            }
-        }
-    }
+    // 移除了 startUpdateTimer, stopUpdateTimer, updateCurrentActivity 方法
 }
