@@ -16,7 +16,7 @@ public class TimeManager: ObservableObject {
             UserDefaultsManager.shared.saveUserSettings(settings)
             WidgetCenter.shared.reloadAllTimelines() // 更新小组件
             
-            // 更新LiveActivity状态
+            // 智能更新LiveActivity
             updateLiveActivityIfNeeded()
         }
     }
@@ -26,12 +26,16 @@ public class TimeManager: ObservableObject {
     @Published var workRecords: [WorkRecord] = []
     
     private var timer: Timer?
+    private var isInBackground = false
     
     init() {
         // 从UserDefaults加载设置
         self.settings = UserDefaultsManager.shared.loadUserSettings()
         self.workRecords = UserDefaultsManager.shared.loadWorkRecords()
         self.startUpdatingIfNeeded()
+        
+        // 设置通知观察者
+        setupNotificationObserver()
     }
     
     // 设置时薪
@@ -115,7 +119,7 @@ public class TimeManager: ObservableObject {
             
             stopUpdating()
             
-            // 更新或结束LiveActivity
+            // 更新LiveActivity状态（保持显示但停止计时）
             LiveActivityManager.shared.updateActivity(with: settings)
         }
     }
@@ -134,7 +138,7 @@ public class TimeManager: ObservableObject {
     
     // 开始定时更新（如果正在工作）
     func startUpdatingIfNeeded() {
-        if settings.isWorking {
+        if settings.isWorking && !isInBackground {
             timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
                 self?.updateCurrentStatus()
             }
@@ -148,19 +152,11 @@ public class TimeManager: ObservableObject {
         timer = nil
         updateCurrentStatus()
     }
-    // 更新LiveActivity（如果需要）
+    
+    // 更新LiveActivity（智能更新）
     func updateLiveActivityIfNeeded() {
-        // 尝试调用常规的更新方法
-        do {
-            LiveActivityManager.shared.updateActivity(with: settings)
-        } catch {
-            // 如果调用失败，使用替代方法
-            print("无法直接更新LiveActivity，尝试替代方法")
-            // 保存最新设置，这将触发数据更新
-            UserDefaultsManager.shared.saveUserSettings(settings)
-            // 刷新小组件时间线
-            WidgetCenter.shared.reloadAllTimelines()
-        }
+        // 使用LiveActivityManager的智能刷新方法
+        LiveActivityManager.shared.smartRefresh()
     }
     
     // 更新当前状态（工作时间和收入）
@@ -176,9 +172,12 @@ public class TimeManager: ObservableObject {
         // 计算收入
         currentEarnings = settings.calculateEarnedMoney()
         
-        // 更新小组件
-        WidgetCenter.shared.reloadAllTimelines()
+        // 智能更新小组件（降低频率）
+        if totalSeconds % 10 == 0 { // 每10秒更新一次
+            WidgetCenter.shared.reloadAllTimelines()
+        }
     }
+    
     // 添加此方法以监听通知更新
     func setupNotificationObserver() {
         // 监听由ScreenStateMonitor发送的更新通知
@@ -188,9 +187,43 @@ public class TimeManager: ObservableObject {
             name: Notification.Name("com.wix.GoldTime.updateLiveActivity"),
             object: nil
         )
+        
+        // 监听应用状态变化
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appDidEnterBackground),
+            name: UIApplication.didEnterBackgroundNotification,
+            object: nil
+        )
+        
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(appWillEnterForeground),
+            name: UIApplication.willEnterForegroundNotification,
+            object: nil
+        )
     }
+    
+    @objc private func appDidEnterBackground() {
+        isInBackground = true
+        // 进入后台时停止高频更新
+        stopUpdating()
+    }
+    
+    @objc private func appWillEnterForeground() {
+        isInBackground = false
+        // 返回前台时恢复更新
+        startUpdatingIfNeeded()
+        // 立即更新一次LiveActivity
+        updateLiveActivityIfNeeded()
+    }
+    
     // 处理更新请求
     @objc private func handleLiveActivityUpdateRequest(_ notification: Notification) {
+        if let userInfo = notification.userInfo,
+           let reason = userInfo["reason"] as? String {
+            print("收到LiveActivity更新请求 - 原因: \(reason)")
+        }
         updateLiveActivityIfNeeded()
     }
     
@@ -273,5 +306,9 @@ public class TimeManager: ObservableObject {
         }
         
         return totalsByCurrency
+    }
+    
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 }
